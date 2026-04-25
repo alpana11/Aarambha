@@ -371,7 +371,7 @@
             </div>
             <div class="stats-card reveal-anim delay-3">
                 <div class="icon-box green"><i class="fa-solid fa-wifi"></i></div>
-                <div class="stat-info"><h3>System Health</h3><p class="stat-value">98%</p></div>
+                <div class="stat-info"><h3>System Health</h3><p class="stat-value" id="mon-health">--</p></div>
             </div>
         </div>
         <div class="charts-grid">
@@ -380,10 +380,14 @@
                 <div style="position:relative;height:300px;width:100%;"><canvas id="fill-level-chart"></canvas></div>
             </div>
             <div class="chart-card reveal-anim delay-2" id="sector-chart-card">
-                <div style="position:relative;height:300px;width:100%;"><canvas id="sector-chart"></canvas></div>
+                <h3 style="margin-bottom:10px;">Avg Fill % by Sector</h3>
+                <div style="position:relative;height:270px;width:100%;"><canvas id="sector-chart"></canvas></div>
             </div>
             <div class="card reveal-anim delay-3">
-                <h3>System Alerts</h3>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">System Alerts</h3>
+                    <span id="active-alert-count" style="font-size:0.8rem;color:var(--text-muted);"></span>
+                </div>
                 <div class="alert-list" id="admin-alerts"></div>
             </div>
         </div>
@@ -391,23 +395,43 @@
 
     <!-- ADMIN: 5. Analytics -->
     <template id="tpl-admin-predictions">
+        <!-- Efficiency Summary Cards -->
         <div class="dashboard-grid">
-            <div class="stats-card">
+            <div class="stats-card reveal-anim delay-1">
                 <div class="icon-box green"><i class="fa-solid fa-brain"></i></div>
-                <div class="stat-info"><h3>Prediction Accuracy</h3><p class="stat-value">92%</p></div>
+                <div class="stat-info"><h3>Prediction Accuracy</h3><p class="stat-value" id="eff-accuracy">--</p></div>
             </div>
-            <div class="stats-card">
+            <div class="stats-card reveal-anim delay-2">
                 <div class="icon-box red"><i class="fa-solid fa-clock-rotate-left"></i></div>
                 <div class="stat-info"><h3>Max Overflow Risk</h3><p class="stat-value" id="pred-risk-bin">--</p></div>
             </div>
-            <div class="stats-card">
-                <div class="icon-box yellow"><i class="fa-solid fa-stopwatch"></i></div>
-                <div class="stat-info"><h3>Avg Fill Time</h3><p class="stat-value">4.5 Hrs</p></div>
+            <div class="stats-card reveal-anim delay-3">
+                <div class="icon-box green"><i class="fa-solid fa-truck-fast"></i></div>
+                <div class="stat-info"><h3>Collections Today</h3><p class="stat-value" id="eff-collections">--</p></div>
+            </div>
+            <div class="stats-card reveal-anim delay-3">
+                <div class="icon-box yellow"><i class="fa-solid fa-leaf"></i></div>
+                <div class="stat-info"><h3>CO₂ Saved</h3><p class="stat-value" id="eff-co2">--</p></div>
+            </div>
+            <div class="stats-card reveal-anim delay-3">
+                <div class="icon-box green"><i class="fa-solid fa-gas-pump"></i></div>
+                <div class="stat-info"><h3>Fuel Saved</h3><p class="stat-value" id="eff-fuel">--</p></div>
             </div>
         </div>
+
+        <!-- Time Range Filter + Export -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+            <div style="display:flex;gap:8px;">
+                <button class="btn secondary-btn pred-range-btn active" onclick="app.initAdminPredictions(5)" data-range="5">±5 Hrs</button>
+                <button class="btn secondary-btn pred-range-btn" onclick="app.initAdminPredictions(12)" data-range="12">±12 Hrs</button>
+                <button class="btn secondary-btn pred-range-btn" onclick="app.initAdminPredictions(24)" data-range="24">±24 Hrs</button>
+            </div>
+            <button class="btn primary-btn" onclick="app.exportAnalyticsCSV()"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+        </div>
+
         <div class="charts-grid" style="margin-bottom:20px;">
             <div class="chart-card">
-                <h3>Trend Analysis: Past vs Predicted (Next 5 Hrs)</h3>
+                <h3>Trend Analysis: Past vs Predicted</h3>
                 <div style="position:relative;height:300px;width:100%;"><canvas id="prediction-line-chart"></canvas></div>
             </div>
             <div class="card">
@@ -415,6 +439,13 @@
                 <ul class="route-stops mt-2" id="smart-insights-list"></ul>
             </div>
         </div>
+
+        <!-- Sector-wise Analytics -->
+        <div class="chart-card reveal-anim" style="margin-bottom:20px;">
+            <h3>Sector-wise Analytics</h3>
+            <div style="position:relative;height:260px;width:100%;"><canvas id="sector-analytics-chart"></canvas></div>
+        </div>
+
         <h3 class="section-title">Proactive Bin Predictions</h3>
         <div class="bins-container" id="prediction-cards-container"></div>
     </template>

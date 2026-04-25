@@ -2153,3 +2153,35 @@ input:checked + .slider { background-color: #2e7d32; }
 input:checked + .slider:before { transform: translateX(22px); }
 .quantum-toggle-container.active { background: white !important; border: 2px solid #00e5ff !important; box-shadow: 0 0 15px rgba(0, 229, 255, 0.2); }
 
+
+/* ================== Analytics Range Filter ================== */
+.pred-range-btn.active {
+    background-color: var(--primary) !important;
+    color: var(--white) !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.25);
+}
+
+/* ================== Alert Dismiss Button ================== */
+.alert-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border-left: 3px solid var(--status-red);
+    background-color: #fff9f9;
+    margin-bottom: 10px;
+    border-radius: 0 6px 6px 0;
+    transition: opacity 0.3s ease;
+}
+
+.alert-item.warning {
+    border-color: var(--status-yellow);
+    background-color: #fffdf5;
+}
+
+.alert-item.fade-dismiss {
+    opacity: 0;
+    transform: translateX(20px);
+    transition: all 0.3s ease;
+}

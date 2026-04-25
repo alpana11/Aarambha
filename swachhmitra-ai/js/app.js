@@ -20,15 +20,18 @@ const MockDB = {
         return bin;
     }),
     alerts: [
-        { id: 1, type: "critical", msg: "BIN-004 is critically full (95%)", time: "2 mins ago" },
-        { id: 2, type: "warning", msg: "BIN-001 reached 85% capacity", time: "10 mins ago" },
-        { id: 3, type: "critical", msg: "Sensor Failure on BIN-008", time: "1 hr ago" }
+        { id: 1, type: "critical", msg: "BIN-004 is critically full (95%)", time: "2 mins ago", dismissed: false },
+        { id: 2, type: "warning", msg: "BIN-001 reached 85% capacity", time: "10 mins ago", dismissed: false },
+        { id: 3, type: "critical", msg: "Sensor Failure on BIN-008", time: "1 hr ago", dismissed: false }
     ],
+    collectionsToday: 0,
+    co2Saved: 0,
     listeners: [],
     onChange: function (callback) { this.listeners.push(callback); },
     trigger: function () { this.listeners.forEach(cb => cb()); },
     getBins: () => Promise.resolve(MockDB.bins),
-    getAlerts: () => Promise.resolve(MockDB.alerts)
+    getAlerts: () => Promise.resolve(MockDB.alerts.filter(a => !a.dismissed)),
+    getAllAlerts: () => Promise.resolve(MockDB.alerts)
 };
 
 // Start simple simulator
@@ -343,15 +346,19 @@ class DashboardApp {
 
     async loadNotifications() {
         const list = document.getElementById('notification-list');
+        if (!list) return;
         const alerts = await MockDB.getAlerts();
-        document.getElementById('notification-badge').innerText = alerts.length;
-        list.innerHTML = alerts.map(a => `
-            <div class="alert-item ${a.type}">
-                <i class="fa-solid ${a.type === 'critical' ? 'fa-triangle-exclamation' : 'fa-circle-exclamation'}"></i>
-                <div class="alert-content">
-                    <h4>${a.msg}</h4>
-                    <p>${a.time}</p>
+        const badge = document.getElementById('notification-badge');
+        if (badge) badge.innerText = alerts.length;
+        list.innerHTML = alerts.length === 0
+            ? `<p style="text-align:center;color:var(--text-muted);padding:10px;">No active alerts.</p>`
+            : alerts.map(a => `
+            <div class="alert-item ${a.type}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+                <div style="display:flex;gap:10px;align-items:flex-start;flex:1;">
+                    <i class="fa-solid ${a.type === 'critical' ? 'fa-triangle-exclamation' : 'fa-circle-exclamation'}" style="margin-top:3px;"></i>
+                    <div class="alert-content"><h4>${a.msg}</h4><p>${a.time}</p></div>
                 </div>
+                <button onclick="app.dismissAlert(${a.id})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.9rem;" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
             </div>
         `).join('');
     }
@@ -371,26 +378,19 @@ class DashboardApp {
                 this.charts['overviewChart'].update();
             }
 
-            // Update sector chart
+            // Update sector chart (avg fill by sector)
             if (this.charts['sectorChart']) {
-                const sectorCounts = bins.reduce((acc, b) => { acc[b.sector] = (acc[b.sector] || 0) + 1; return acc; }, {});
-                this.charts['sectorChart'].data.datasets[0].data = Object.values(sectorCounts);
+                const sectors = [...new Set(bins.map(b => b.sector))];
+                const sectorAvgFill = sectors.map(s => {
+                    const sb = bins.filter(b => b.sector === s);
+                    return Math.round(sb.reduce((sum, b) => sum + b.fillLevel, 0) / sb.length);
+                });
+                this.charts['sectorChart'].data.datasets[0].data = sectorAvgFill;
                 this.charts['sectorChart'].update();
             }
 
-            // Update Live Alerts
-            const alertsList = document.getElementById('admin-alerts');
-            if (alertsList) {
-                const alerts = await MockDB.getAlerts();
-                alertsList.innerHTML = alerts.map(a => `
-                    <div class="alert-item ${a.type}">
-                        <div class="alert-content">
-                            <h4>${a.msg}</h4>
-                            <p>${a.time}</p>
-                        </div>
-                    </div>
-                `).join('');
-            }
+            // Update Live Alerts (dismissable)
+            this.renderAdminAlerts();
 
             // Re-calculate stats silently
             const statValues = document.querySelectorAll('#dashboard-view.active .stat-value');
@@ -608,10 +608,14 @@ class DashboardApp {
         const total = bins.length;
         const full = bins.filter(b => b.fillLevel >= 90).length;
         const medium = bins.filter(b => b.fillLevel >= 40 && b.fillLevel < 90).length;
+        const onlineBins = bins.filter(b => b.status !== 'connecting').length;
+        const healthPct = Math.round((onlineBins / total) * 100);
+
         const el = (id, val) => { const e = document.getElementById(id); if (e) e.innerText = val; };
         el('mon-total', total); el('mon-full', full); el('mon-medium', medium);
+        el('mon-health', healthPct + '%');
 
-        // Hide status distribution chart for users
+        // Hide sector chart for users
         const sectorCard = document.getElementById('sector-chart-card');
         if (sectorCard && this.role === 'user') sectorCard.style.display = 'none';
 
@@ -626,21 +630,71 @@ class DashboardApp {
             options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } }
         });
 
-        // Pie chart — status distribution
+        // Sector-wise avg fill chart (replaces old status pie)
         const sCtx = document.getElementById('sector-chart').getContext('2d');
-        const statusCounts = { Full: full, Medium: medium, Empty: total - full - medium };
+        const sectors = [...new Set(bins.map(b => b.sector))];
+        const sectorAvgFill = sectors.map(s => {
+            const sectorBins = bins.filter(b => b.sector === s);
+            return Math.round(sectorBins.reduce((sum, b) => sum + b.fillLevel, 0) / sectorBins.length);
+        });
+        const sectorColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#E53935'];
         this.charts['sectorChart'] = new Chart(sCtx, {
-            type: 'pie',
-            data: { labels: Object.keys(statusCounts), datasets: [{ data: Object.values(statusCounts), backgroundColor: ['#E53935', '#FFB300', '#4CAF50'] }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            type: 'doughnut',
+            data: {
+                labels: sectors,
+                datasets: [{ data: sectorAvgFill, backgroundColor: sectorColors.slice(0, sectors.length), borderWidth: 2 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    title: { display: true, text: 'Avg Fill % by Sector', color: '#1b5e20', font: { size: 13 } }
+                }
+            }
         });
 
-        // Alerts
+        // Dismissable Alerts
+        this.renderAdminAlerts();
+    }
+
+    async renderAdminAlerts() {
         const alertsList = document.getElementById('admin-alerts');
+        if (!alertsList) return;
         const alerts = await MockDB.getAlerts();
-        if (alertsList) alertsList.innerHTML = alerts.map(a => `
-            <div class="alert-item ${a.type}"><div class="alert-content"><h4>${a.msg}</h4><p>${a.time}</p></div></div>
+        if (alerts.length === 0) {
+            alertsList.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fa-solid fa-circle-check" style="color:var(--status-green);font-size:2rem;"></i><p style="margin-top:8px;">All clear! No active alerts.</p></div>`;
+            return;
+        }
+        alertsList.innerHTML = alerts.map(a => `
+            <div class="alert-item ${a.type}" id="alert-${a.id}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+                <div style="display:flex;gap:10px;align-items:flex-start;flex:1;">
+                    <i class="fa-solid ${a.type === 'critical' ? 'fa-triangle-exclamation' : 'fa-circle-exclamation'}" style="margin-top:3px;color:${a.type === 'critical' ? 'var(--status-red)' : 'var(--status-yellow)'}"></i>
+                    <div class="alert-content">
+                        <h4>${a.msg}</h4>
+                        <p>${a.time}</p>
+                    </div>
+                </div>
+                <button onclick="app.dismissAlert(${a.id})" title="Dismiss" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:2px 6px;border-radius:4px;transition:0.2s;" onmouseover="this.style.color='var(--status-red)'" onmouseout="this.style.color='var(--text-muted)'">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
         `).join('');
+    }
+
+    dismissAlert(id) {
+        const alertEl = document.getElementById(`alert-${id}`);
+        if (alertEl) {
+            alertEl.classList.add('fade-dismiss');
+            setTimeout(() => {
+                const alert = MockDB.alerts.find(a => a.id === id);
+                if (alert) alert.dismissed = true;
+                this.renderAdminAlerts();
+                const activeAlerts = MockDB.alerts.filter(a => !a.dismissed).length;
+                const badge = document.getElementById('notification-badge');
+                if (badge) badge.innerText = activeAlerts;
+                this.showToast('Alert dismissed.', 'info');
+            }, 300);
+        }
     }
 
     async initAdminRoutes() {
@@ -995,111 +1049,136 @@ class DashboardApp {
         this.showToast(`Thresholds applied: High >${high}%, Medium >=${medium}%`, 'success');
     }
 
-    async initAdminPredictions() {
+    async initAdminPredictions(range = 5) {
+        // Update active range button
+        document.querySelectorAll('.pred-range-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.range) === range);
+        });
         const bins = await MockDB.getBins();
+        this._predRange = range;
+
+        // Efficiency summary
+        const totalCollections = MockDB.collectionsToday + bins.filter(b => b.fillLevel < 10).length;
+        const co2 = (totalCollections * 2.4).toFixed(1);
+        const fuelSaved = (totalCollections * 0.8).toFixed(1);
+        const el = (id, val) => { const e = document.getElementById(id); if (e) e.innerText = val; };
+        el('eff-collections', totalCollections);
+        el('eff-co2', co2 + ' kg');
+        el('eff-fuel', fuelSaved + ' L');
+        el('eff-accuracy', '92%');
 
         let maxRiskBin = bins[0];
-        let totalFillHrs = 0;
-
         const predictedBins = bins.map(bin => {
-            // Simulated historic fill rate: random deterministic % per hour
-            let rate = (bin.id.charCodeAt(bin.id.length - 1) % 5) + 3.5;
-
-            let remainingSpace = 100 - bin.fillLevel;
-            let hrsTillFull = (remainingSpace / rate).toFixed(1);
-            if (hrsTillFull < 0) hrsTillFull = 0;
-
-            if (parseFloat(hrsTillFull) < parseFloat((100 - maxRiskBin.fillLevel) / ((maxRiskBin.id.charCodeAt(maxRiskBin.id.length - 1) % 5) + 3.5))) {
+            const rate = (bin.id.charCodeAt(bin.id.length - 1) % 5) + 3.5;
+            const hrsTillFull = Math.max(0, ((100 - bin.fillLevel) / rate)).toFixed(1);
+            if (parseFloat(hrsTillFull) < parseFloat(((100 - maxRiskBin.fillLevel) / ((maxRiskBin.id.charCodeAt(maxRiskBin.id.length - 1) % 5) + 3.5)))) {
                 maxRiskBin = bin;
             }
-
-            totalFillHrs += parseFloat(hrsTillFull);
-
-            return {
-                ...bin,
-                predictedHrs: hrsTillFull,
-                fillRate: rate.toFixed(1)
-            };
+            return { ...bin, predictedHrs: hrsTillFull, fillRate: rate.toFixed(1) };
         });
-
         predictedBins.sort((a, b) => parseFloat(a.predictedHrs) - parseFloat(b.predictedHrs));
 
-        const elem = document.getElementById('pred-risk-bin');
-        if (elem) elem.innerText = maxRiskBin.id;
+        el('pred-risk-bin', maxRiskBin.id);
 
         const insightsList = document.getElementById('smart-insights-list');
         if (insightsList) {
             insightsList.innerHTML = `
-                <li><i class="fa-solid fa-triangle-exclamation" style="color:var(--status-red); font-size:1.2rem;"></i> <div><strong>${predictedBins[0].id}</strong> will overflow in ~${predictedBins[0].predictedHrs} hrs! Schedule priority collection.</div></li>
-                <li><i class="fa-solid fa-bolt" style="color:var(--status-yellow); font-size:1.2rem;"></i> <div><strong>${predictedBins[1].id}</strong> has a high fill rate of ${predictedBins[1].fillRate}%/hr due to high traffic area.</div></li>
-                <li><i class="fa-solid fa-leaf" style="color:var(--status-green); font-size:1.2rem;"></i> <div>Route Optimization can safely skip <strong>${predictedBins[predictedBins.length - 1].id}</strong> today.</div></li>
+                <li><i class="fa-solid fa-triangle-exclamation" style="color:var(--status-red);font-size:1.2rem;"></i><div><strong>${predictedBins[0].id}</strong> will overflow in ~${predictedBins[0].predictedHrs} hrs! Schedule priority collection.</div></li>
+                <li><i class="fa-solid fa-bolt" style="color:var(--status-yellow);font-size:1.2rem;"></i><div><strong>${predictedBins[1].id}</strong> has a high fill rate of ${predictedBins[1].fillRate}%/hr due to high traffic area.</div></li>
+                <li><i class="fa-solid fa-leaf" style="color:var(--status-green);font-size:1.2rem;"></i><div>Route Optimization can safely skip <strong>${predictedBins[predictedBins.length - 1].id}</strong> today.</div></li>
             `;
         }
 
         const cardsContainer = document.getElementById('prediction-cards-container');
         if (cardsContainer) {
             cardsContainer.innerHTML = predictedBins.map(b => {
-                let urgency = b.predictedHrs <= 5 ? 'full' : (b.predictedHrs <= 12 ? 'medium' : 'empty');
-                let colorStr = urgency === 'full' ? 'var(--status-red)' : (urgency === 'medium' ? 'var(--status-yellow)' : 'var(--status-green)');
-                return `
-                 <div class="bin-card ${urgency}">
+                const urgency = parseFloat(b.predictedHrs) <= 5 ? 'full' : (parseFloat(b.predictedHrs) <= 12 ? 'medium' : 'empty');
+                const colorStr = urgency === 'full' ? 'var(--status-red)' : (urgency === 'medium' ? 'var(--status-yellow)' : 'var(--status-green)');
+                return `<div class="bin-card ${urgency}">
                     <div class="bin-header">
                         <h4><i class="fa-solid fa-chart-line"></i> ${b.id}</h4>
-                        <span class="fill-badge" style="color:${colorStr}; background:${colorStr}20">In ${b.predictedHrs} Hrs</span>
+                        <span class="fill-badge" style="color:${colorStr};background:${colorStr}20">In ${b.predictedHrs} Hrs</span>
                     </div>
                     <div class="progress-bar-container" style="height:4px;"><div class="progress-bar" style="width:${b.fillLevel}%;background-color:${colorStr};"></div></div>
-                    <div class="bin-details-text mt-2">
-                        <span>Fill: ${b.fillLevel}%</span>
-                        <span>Rate: ${b.fillRate}%/hr</span>
-                    </div>
-                 </div>
-                 `;
+                    <div class="bin-details-text mt-2"><span>Fill: ${b.fillLevel}%</span><span>Rate: ${b.fillRate}%/hr</span></div>
+                </div>`;
             }).join('');
         }
 
+        // Trend line chart with dynamic range
         const chartCanvas = document.getElementById('prediction-line-chart');
-        if (!chartCanvas) return;
-        const ctx = chartCanvas.getContext('2d');
-        const labels = ['-5h', '-4h', '-3h', '-2h', '-1h', 'Now', '+1h', '+2h', '+3h', '+4h', '+5h'];
+        if (chartCanvas) {
+            if (this.charts['predLineChart']) this.charts['predLineChart'].destroy();
+            const ctx = chartCanvas.getContext('2d');
+            const r = range;
+            const labels = [];
+            for (let i = -r; i <= r; i++) labels.push(i === 0 ? 'Now' : (i < 0 ? `${i}h` : `+${i}h`));
+            const currentFill = maxRiskBin.fillLevel;
+            const rate = (maxRiskBin.id.charCodeAt(maxRiskBin.id.length - 1) % 5) + 3.5;
+            const pastData = [];
+            for (let i = r; i >= 1; i--) pastData.push(Math.max(0, currentFill - (rate * i)));
+            pastData.push(currentFill);
+            const futureData = Array(r).fill(null);
+            futureData.push(currentFill);
+            for (let i = 1; i <= r; i++) futureData.push(Math.min(100, currentFill + (rate * i)));
+            this.charts['predLineChart'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: `Historical (${maxRiskBin.id})`, data: pastData.concat(Array(r).fill(null)), borderColor: '#A5D6A7', backgroundColor: 'rgba(165,214,167,0.2)', fill: true, tension: 0.3 },
+                        { label: 'AI Predicted Trend', data: futureData, borderColor: '#E53935', borderDash: [5, 5], fill: false, tension: 0.3 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } }
+            });
+        }
 
-        let currentFill = maxRiskBin.fillLevel;
-        let rate = (maxRiskBin.id.charCodeAt(maxRiskBin.id.length - 1) % 5) + 3.5;
+        // Sector-wise analytics bar chart
+        const sectorCanvas = document.getElementById('sector-analytics-chart');
+        if (sectorCanvas) {
+            if (this.charts['sectorAnalyticsChart']) this.charts['sectorAnalyticsChart'].destroy();
+            const sCtx = sectorCanvas.getContext('2d');
+            const sectors = [...new Set(bins.map(b => b.sector))];
+            const sectorData = sectors.map(s => {
+                const sb = bins.filter(b => b.sector === s);
+                return {
+                    avg: Math.round(sb.reduce((sum, b) => sum + b.fillLevel, 0) / sb.length),
+                    high: sb.filter(b => b.priority === 'High').length,
+                    total: sb.length
+                };
+            });
+            this.charts['sectorAnalyticsChart'] = new Chart(sCtx, {
+                type: 'bar',
+                data: {
+                    labels: sectors,
+                    datasets: [
+                        { label: 'Avg Fill %', data: sectorData.map(d => d.avg), backgroundColor: '#4CAF50', borderRadius: 4 },
+                        { label: 'High Priority Bins', data: sectorData.map(d => d.high), backgroundColor: '#E53935', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, max: Math.max(100, ...sectorData.map(d => d.total)) } },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        }
+    }
 
-        let pastData = [];
-        for (let i = 5; i >= 1; i--) pastData.push(Math.max(0, currentFill - (rate * i)));
-        pastData.push(currentFill);
-
-        let futureData = [null, null, null, null, null, currentFill];
-        for (let i = 1; i <= 5; i++) futureData.push(Math.min(100, currentFill + (rate * i)));
-
-        this.charts['predLineChart'] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: `Historical (${maxRiskBin.id})`,
-                        data: pastData.concat([null, null, null, null, null]),
-                        borderColor: '#A5D6A7',
-                        backgroundColor: 'rgba(165, 214, 167, 0.2)',
-                        fill: true,
-                        tension: 0.3
-                    },
-                    {
-                        label: `AI Predicted Trend`,
-                        data: futureData,
-                        borderColor: '#E53935',
-                        borderDash: [5, 5],
-                        fill: false,
-                        tension: 0.3
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true, max: 100 } }
-            }
+    exportAnalyticsCSV() {
+        MockDB.getBins().then(bins => {
+            const rows = [['Bin ID', 'Sector', 'Area Type', 'Location', 'Fill Level (%)', 'Priority', 'Status', 'Last Updated']];
+            bins.forEach(b => rows.push([b.id, b.sector, b.areaType, b.location, b.fillLevel, b.priority, b.status, b.lastUpdated]));
+            const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `swachhmitra_analytics_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            this.showToast('Analytics exported as CSV!', 'info');
         });
     }
 
