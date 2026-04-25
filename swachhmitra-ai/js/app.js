@@ -452,7 +452,7 @@ class DashboardApp {
 
     async initUserMap() {
         const map = L.map('user-map').setView([28.6139, 77.2090], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap &copy; CARTO' }).addTo(map);
         this.maps['userMap'] = map;
         setTimeout(() => map.invalidateSize(), 100);
 
@@ -650,7 +650,7 @@ class DashboardApp {
     async initAdminRoutes() {
         // Init Map
         const map = L.map('admin-route-map').setView([28.6139, 77.2090], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap &copy; CARTO' }).addTo(map);
         this.maps['routeMap'] = map;
         this.routeMarkers = {};
         setTimeout(() => map.invalidateSize(), 100);

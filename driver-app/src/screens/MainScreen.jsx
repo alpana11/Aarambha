@@ -27,7 +27,7 @@ export default function MainScreen() {
   const [activeTab,      setActiveTab]      = useState('route');
   const [time,           setTime]           = useState(getTime());
   const [profileOpen,    setProfileOpen]    = useState(false);
-  const { bins, collectedCount, total, distanceCovered, driver, routeSummary } = useBins();
+  const { bins, loading, collectedCount, total, distanceCovered, driver, routeSummary } = useBins();
 
   const location = useLocation();
 
@@ -111,6 +111,16 @@ export default function MainScreen() {
           }} />
         </div>
       </div>
+
+      {/* ── Loading state ── */}
+      {loading && (
+        <div style={{ position: 'absolute', top: TOP_H, bottom: BOT_H, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f8f4', zIndex: 5 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ width: 32, height: 32, border: '3px solid #bbf7d0', borderTopColor: '#16a34a', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Loading route...</div>
+          </div>
+        </div>
+      )}
 
       {/* ── Scrollable content ── */}
       <div className="scroll-area" style={{ position: 'absolute', top: TOP_H, bottom: 0, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden', paddingBottom: BOT_H }}>

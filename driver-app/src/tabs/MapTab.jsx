@@ -24,15 +24,15 @@ const LEGEND = [
   { color: '#22c55e', label: 'Done' },
 ];
 
-// Fallback coords for bins that don't have lat/lng yet (Kathmandu area)
+// Fallback coords matching web app's Delhi area (28.6139, 77.2090)
 const FALLBACK_COORDS = [
-  [27.7172, 85.3240],
-  [27.7180, 85.3255],
-  [27.7165, 85.3270],
-  [27.7190, 85.3230],
-  [27.7155, 85.3260],
-  [27.7200, 85.3245],
-  [27.7175, 85.3280],
+  [28.6155, 77.2105],
+  [28.6170, 77.2125],
+  [28.6140, 77.2140],
+  [28.6185, 77.2090],
+  [28.6125, 77.2115],
+  [28.6200, 77.2080],
+  [28.6165, 77.2155],
 ];
 
 // Auto-fit map bounds to all markers
@@ -51,7 +51,7 @@ export default function MapTab({ bins, collectedCount, total, routeSummary, driv
   const positions = sorted.map((b, i) =>
     b.lat && b.lng ? [b.lat, b.lng] : FALLBACK_COORDS[i] ?? FALLBACK_COORDS[0]
   );
-  const center = positions[0] ?? [27.7172, 85.3240];
+  const center = positions[0] ?? [28.6139, 77.2090];
 
   return (
     <div style={{ padding: '12px 16px 20px', background: '#f1f8f4' }}>
@@ -66,8 +66,8 @@ export default function MapTab({ bins, collectedCount, total, routeSummary, driv
           attributionControl={false}
         >
           <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="© OpenStreetMap"
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution="&copy; OpenStreetMap &copy; CARTO"
           />
 
           <FitBounds positions={positions} />

@@ -1,7 +1,7 @@
 export const bins = [
   {
     id:            'BIN-041',
-    name:          'Subhash Nagar #1',
+    name:          'Subhash Nagar 1',
     area:          'Residential',
     priority:      'DONE',
     fillLevel:     100,
@@ -13,7 +13,7 @@ export const bins = [
   },
   {
     id:            'BIN-042',
-    name:          'Bus Stand Bin #2',
+    name:          'Bus Stand Bin 2',
     area:          'Transit Hub',
     priority:      'DONE',
     fillLevel:     95,
@@ -25,7 +25,7 @@ export const bins = [
   },
   {
     id:            'BIN-043',
-    name:          'Market Square Bin #03',
+    name:          'Market Square Bin 03',
     area:          'Market Area',
     priority:      'HIGH',
     fillLevel:     92,
@@ -37,7 +37,7 @@ export const bins = [
   },
   {
     id:            'BIN-044',
-    name:          'Patel Nagar Stop #1',
+    name:          'Patel Nagar Stop 1',
     area:          'Residential',
     priority:      'HIGH',
     fillLevel:     88,
@@ -49,7 +49,7 @@ export const bins = [
   },
   {
     id:            'BIN-045',
-    name:          'City Park Bin #A',
+    name:          'City Park Bin A',
     area:          'Park Area',
     priority:      'MEDIUM',
     fillLevel:     71,
@@ -61,7 +61,7 @@ export const bins = [
   },
   {
     id:            'BIN-046',
-    name:          'Office Complex #B2',
+    name:          'Office Complex B2',
     area:          'Office Zone',
     priority:      'MEDIUM',
     fillLevel:     68,
@@ -73,7 +73,7 @@ export const bins = [
   },
   {
     id:            'BIN-047',
-    name:          'Gandhi Chowk Bin #5',
+    name:          'Gandhi Chowk Bin 5',
     area:          'Market Area',
     priority:      'MEDIUM',
     fillLevel:     65,
