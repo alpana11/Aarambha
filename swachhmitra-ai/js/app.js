@@ -97,20 +97,26 @@ class DashboardApp {
         const nameGroup = document.getElementById('signup-name-group');
         const roleGroup = document.getElementById('login-role-group');
 
+        const phoneGroup   = document.getElementById('signup-phone-group');
+        const addressGroup = document.getElementById('signup-address-group');
         if (mode === 'signup') {
             submitBtn.innerText = 'Create Account';
             switchText.innerText = 'Sign up for user access';
             tabSignup.classList.add('active');
             tabLogin.classList.remove('active');
-            if (nameGroup) nameGroup.style.display = 'block';
-            if (roleGroup) roleGroup.style.display = 'none';
+            if (nameGroup)    nameGroup.style.display    = 'block';
+            if (phoneGroup)   phoneGroup.style.display   = 'block';
+            if (addressGroup) addressGroup.style.display = 'block';
+            if (roleGroup)    roleGroup.style.display    = 'none';
         } else {
             submitBtn.innerText = 'Login to Dashboard';
             switchText.innerText = 'Access for Admin or Registered Users';
             tabLogin.classList.add('active');
             tabSignup.classList.remove('active');
-            if (nameGroup) nameGroup.style.display = 'none';
-            if (roleGroup) roleGroup.style.display = 'block';
+            if (nameGroup)    nameGroup.style.display    = 'none';
+            if (phoneGroup)   phoneGroup.style.display   = 'none';
+            if (addressGroup) addressGroup.style.display = 'none';
+            if (roleGroup)    roleGroup.style.display    = 'block';
         }
     }
 
@@ -120,11 +126,14 @@ class DashboardApp {
         const pass = document.getElementById('auth-password').value.trim();
 
         if (this.authMode === 'signup') {
-            const name = document.getElementById('auth-name').value.trim();
+            const name    = document.getElementById('auth-name').value.trim();
+            const phone   = document.getElementById('auth-phone').value.trim();
+            const address = document.getElementById('auth-address').value.trim();
             if (!name || !email || !pass) { alert('Please fill all fields.'); return; }
-            const users = await DB.getUsers();
+            const users = this.getUsers();
             if (users.find(u => u.email === email)) { alert('Email already registered. Please login.'); return; }
-            await DB.addUser({ name, email, pass, role: 'user' });
+            users.push({ name, email, pass, phone, address, role: 'user', ecoPoints: 350 });
+            this.saveUsers(users);
             alert(`Account created for ${name}! Please login.`);
             this.setAuthMode('login');
         } else {
@@ -136,9 +145,10 @@ class DashboardApp {
                     alert('Invalid admin credentials! Use: admin / admin123');
                 }
             } else {
-                const match = await DB.findUser(email, pass);
+                const users = this.getUsers();
+                const match = users.find(u => u.email === email && u.pass === pass);
                 if (match) {
-                    this.initiateDashboard('user', match.name);
+                    this.initiateDashboard('user', match.name, match);
                 } else if (email.length > 0 && pass.length > 0) {
                     this.initiateDashboard('user', email);
                 } else {
@@ -148,9 +158,10 @@ class DashboardApp {
         }
     }
 
-    initiateDashboard(role, username = 'User') {
-        this.role = role;
+    initiateDashboard(role, username = 'User', userObj = null) {
+        this.role     = role;
         this.username = username;
+        this.userObj  = userObj;
 
         localStorage.setItem('eco_role', role);
         localStorage.setItem('eco_username', username);
@@ -168,6 +179,35 @@ class DashboardApp {
 
         const chatbot = document.getElementById('chatbot-wrapper');
         if (chatbot) chatbot.style.display = 'block';
+
+        // Populate profile dropdown
+        this._updateProfileDropdown();
+    }
+
+    _updateProfileDropdown() {
+        const users = this.getUsers();
+        const u = users.find(u => u.email === this.username) || this.userObj || {};
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val || '--'; };
+        set('profile-name',    u.name    || this.username || 'User');
+        set('profile-email',   u.email   || this.username || '--');
+        set('profile-phone',   u.phone   || '--');
+        set('profile-address', u.address || '--');
+        set('profile-points',  u.ecoPoints || 350);
+        const badge = document.getElementById('profile-role-badge');
+        if (badge) {
+            badge.innerText = this.role === 'admin' ? 'Admin' : 'User';
+            badge.style.background = this.role === 'admin' ? '#e3f2fd' : '#e8f5e9';
+            badge.style.color      = this.role === 'admin' ? '#1565c0' : '#2e7d32';
+        }
+    }
+
+    toggleProfileDropdown() {
+        const dd = document.getElementById('profile-dropdown');
+        if (!dd) return;
+        const isOpen = dd.style.display === 'block';
+        // close notifications if open
+        document.getElementById('notifications-dropdown').classList.remove('active');
+        dd.style.display = isOpen ? 'none' : 'block';
     }
     logout() {
         this.role = null;
@@ -1402,8 +1442,10 @@ const app = new DashboardApp();
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.notification-bell') && !e.target.closest('.notifications-dropdown')) {
         const dropdown = document.getElementById('notifications-dropdown');
-        if (dropdown && dropdown.classList.contains('active')) {
-            dropdown.classList.remove('active');
-        }
+        if (dropdown && dropdown.classList.contains('active')) dropdown.classList.remove('active');
+    }
+    if (!e.target.closest('.profile-pic') && !e.target.closest('#profile-dropdown')) {
+        const pd = document.getElementById('profile-dropdown');
+        if (pd) pd.style.display = 'none';
     }
 });
