@@ -23,6 +23,7 @@ function PendingRow({ bin, isNext }) {
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
+      className="tap"
       style={{
         background: rowBg,
         borderRadius: 12,
@@ -31,7 +32,6 @@ function PendingRow({ bin, isNext }) {
         padding: '10px 12px',
         display: 'flex', alignItems: 'center', gap: 10,
         cursor: 'pointer',
-        transition: 'background 0.12s',
       }}
     >
       {/* Icon */}
@@ -81,16 +81,16 @@ function DoneRow({ bin }) {
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
+      className="tap"
       style={{
-        background: pressed ? '#f3f4f6' : '#fafafa',
+        background: pressed ? '#e8f5ee' : '#fafafa',
         borderRadius: 12,
         border: '1px solid #f0f0f0',
         borderLeft: '3px solid #86efac',
         padding: '9px 12px',
         display: 'flex', alignItems: 'center', gap: 10,
         cursor: 'pointer',
-        opacity: 0.82,
-        transition: 'background 0.12s',
+        opacity: 0.85,
       }}
     >
       {/* Icon */}
@@ -99,7 +99,7 @@ function DoneRow({ bin }) {
         background: '#dcfce7',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <CheckCircle size={14} color="#16a34a" strokeWidth={2.5} />
+        <CheckCircle size={14} color="#16a34a" strokeWidth={2} />
       </div>
 
       {/* Text */}
@@ -134,7 +134,7 @@ export default function BinsTab({ bins }) {
   const done       = bins.filter(b => b.priority === 'DONE');
 
   return (
-    <div style={{ padding: '12px 16px 20px', background: '#f3f4f6' }}>
+    <div style={{ padding: '12px 16px 20px', background: '#f1f8f4' }}>
 
       {/* ── Summary strip ── */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
@@ -154,7 +154,7 @@ export default function BinsTab({ bins }) {
       {pending.length > 0 && (
         <>
           <div style={sectionHeader}>
-            <AlertCircle size={11} color="#d97706" strokeWidth={2.5} />
+            <AlertCircle size={11} color="#d97706" strokeWidth={2} />
             Pending <span style={sectionCount}>{pending.length}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -167,7 +167,7 @@ export default function BinsTab({ bins }) {
       {done.length > 0 && (
         <>
           <div style={{ ...sectionHeader, marginTop: 16 }}>
-            <CheckCircle size={11} color="#16a34a" strokeWidth={2.5} />
+            <CheckCircle size={11} color="#16a34a" strokeWidth={2} />
             Completed <span style={sectionCount}>{done.length}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
