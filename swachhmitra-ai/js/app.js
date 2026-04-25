@@ -1,56 +1,5 @@
-const MockDB = {
-    bins: [
-        { id: "BIN-001", sector: "School", areaType: "residential", location: "Central Campus Dr", lat: 28.6139, lng: 77.2090, fillLevel: 0, lastUpdated: "Connecting...", status: "connecting", temp: 0, hum: 0, isIoT: true },
-        { id: "BIN-002", sector: "Office", areaType: "office", location: "Tech Plaza East", lat: 28.6145, lng: 77.2080, fillLevel: 45, lastUpdated: "12 mins ago", status: "medium" },
-        { id: "BIN-003", sector: "Industrial", areaType: "market", location: "Warehouse Block C", lat: 28.6150, lng: 77.2070, fillLevel: 10, lastUpdated: "2 mins ago", status: "empty" },
-        { id: "BIN-004", sector: "Public", areaType: "market", location: "City Square Mall", lat: 28.6160, lng: 77.2100, fillLevel: 95, lastUpdated: "1 min ago", status: "full" },
-        { id: "BIN-005", sector: "School", areaType: "residential", location: "Main Library", lat: 28.6130, lng: 77.2110, fillLevel: 60, lastUpdated: "5 mins ago", status: "medium" },
-        { id: "BIN-006", sector: "Public", areaType: "market", location: "Kartavya Path", lat: 28.6125, lng: 77.2125, fillLevel: 72, lastUpdated: "Just now", status: "medium" },
-        { id: "BIN-007", sector: "Office", areaType: "office", location: "Delhi Gate St", lat: 28.6100, lng: 77.2100, fillLevel: 31, lastUpdated: "8 mins ago", status: "empty" },
-        { id: "BIN-008", sector: "Industrial", areaType: "market", location: "Rouse Ave", lat: 28.6180, lng: 77.2150, fillLevel: 88, lastUpdated: "4 mins ago", status: "full" },
-        { id: "BIN-009", sector: "Public", areaType: "market", location: "Mandi House", lat: 28.6165, lng: 77.2180, fillLevel: 22, lastUpdated: "12 mins ago", status: "empty" },
-        { id: "BIN-010", sector: "Office", areaType: "office", location: "Connaught Place", lat: 28.6200, lng: 77.2100, fillLevel: 55, lastUpdated: "3 mins ago", status: "medium" },
-        { id: "BIN-011", sector: "School", areaType: "residential", location: "Shastri Bhawan", lat: 28.6140, lng: 77.2150, fillLevel: 68, lastUpdated: "Just now", status: "medium" },
-        { id: "BIN-012", sector: "Public", areaType: "market", location: "Indira Chowk", lat: 28.6210, lng: 77.2140, fillLevel: 42, lastUpdated: "7 mins ago", status: "medium" },
-        { id: "BIN-013", sector: "Industrial", areaType: "market", location: "Minto Rd", lat: 28.6250, lng: 77.2180, fillLevel: 91, lastUpdated: "1 min ago", status: "full" },
-        { id: "BIN-014", sector: "Office", areaType: "office", location: "Barakhamba", lat: 28.6220, lng: 77.2220, fillLevel: 15, lastUpdated: "20 mins ago", status: "empty" },
-        { id: "BIN-015", sector: "Public", areaType: "market", location: "Janpath Market", lat: 28.6180, lng: 77.2120, fillLevel: 79, lastUpdated: "Just now", status: "medium" }
-    ].map(bin => {
-        bin.priority = bin.fillLevel > 70 ? 'High' : (bin.fillLevel >= 40 ? 'Medium' : 'Low');
-        return bin;
-    }),
-    alerts: [
-        { id: 1, type: "critical", msg: "BIN-004 is critically full (95%)", time: "2 mins ago", dismissed: false },
-        { id: 2, type: "warning", msg: "BIN-001 reached 85% capacity", time: "10 mins ago", dismissed: false },
-        { id: 3, type: "critical", msg: "Sensor Failure on BIN-008", time: "1 hr ago", dismissed: false }
-    ],
-    collectionsToday: 0,
-    co2Saved: 0,
-    listeners: [],
-    onChange: function (callback) { this.listeners.push(callback); },
-    trigger: function () { this.listeners.forEach(cb => cb()); },
-    getBins: () => Promise.resolve(MockDB.bins),
-    getAlerts: () => Promise.resolve(MockDB.alerts.filter(a => !a.dismissed)),
-    getAllAlerts: () => Promise.resolve(MockDB.alerts)
-};
-
-// Start simple simulator
-setInterval(() => {
-    let changed = false;
-    MockDB.bins.forEach(bin => {
-        if (Math.random() > 0.8) {
-            bin.fillLevel += Math.floor(Math.random() * 5);
-            if (bin.fillLevel >= 100) bin.fillLevel = 0;
-            bin.priority = bin.fillLevel > 70 ? 'High' : (bin.fillLevel >= 40 ? 'Medium' : 'Low');
-            
-            if (bin.fillLevel >= 90) bin.status = 'full';
-            else if (bin.fillLevel >= 50) bin.status = 'medium';
-            else bin.status = 'empty';
-            changed = true;
-        }
-    });
-    if (changed) MockDB.trigger();
-}, 5000);
+// FirebaseDB is loaded from js/db.js — used everywhere below instead of MockDB
+const DB = FirebaseDB;
 
 class DashboardApp {
     constructor() {
@@ -76,8 +25,11 @@ class DashboardApp {
         this.loadNotifications();
         this.newAlertsCount = 0;
 
-        // Listen for Real-Time data simulated from Firebase/ESP32
-        MockDB.onChange(() => this.updateRealTimeData());
+        // Init Firebase real-time listeners
+        DB.init();
+
+        // Listen for real-time Firestore updates
+        DB.onChange(() => this.updateRealTimeData());
 
         // GSAP Splash Screen Animation
         window.addEventListener('load', () => {
@@ -170,10 +122,9 @@ class DashboardApp {
         if (this.authMode === 'signup') {
             const name = document.getElementById('auth-name').value.trim();
             if (!name || !email || !pass) { alert('Please fill all fields.'); return; }
-            const users = this.getUsers();
+            const users = await DB.getUsers();
             if (users.find(u => u.email === email)) { alert('Email already registered. Please login.'); return; }
-            users.push({ name, email, pass });
-            this.saveUsers(users);
+            await DB.addUser({ name, email, pass, role: 'user' });
             alert(`Account created for ${name}! Please login.`);
             this.setAuthMode('login');
         } else {
@@ -185,12 +136,10 @@ class DashboardApp {
                     alert('Invalid admin credentials! Use: admin / admin123');
                 }
             } else {
-                const users = this.getUsers();
-                const match = users.find(u => u.email === email && u.pass === pass);
+                const match = await DB.findUser(email, pass);
                 if (match) {
                     this.initiateDashboard('user', match.name);
                 } else if (email.length > 0 && pass.length > 0) {
-                    // Allow any email/pass as guest user
                     this.initiateDashboard('user', email);
                 } else {
                     alert('Invalid credentials!');
@@ -347,7 +296,7 @@ class DashboardApp {
     async loadNotifications() {
         const list = document.getElementById('notification-list');
         if (!list) return;
-        const alerts = await MockDB.getAlerts();
+        const alerts = await DB.getAlerts();
         const badge = document.getElementById('notification-badge');
         if (badge) badge.innerText = alerts.length;
         list.innerHTML = alerts.length === 0
@@ -364,9 +313,9 @@ class DashboardApp {
     }
 
     async updateRealTimeData() {
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
 
-        let alerts = await MockDB.getAlerts();
+        let alerts = await DB.getAlerts();
         document.getElementById('notification-badge').innerText = alerts.length;
 
         // Smart partial-updates based on view, without destroying chart/map states.
@@ -376,17 +325,6 @@ class DashboardApp {
                 this.charts['overviewChart'].data.datasets[0].data = bins.map(b => b.fillLevel);
                 this.charts['overviewChart'].data.datasets[0].backgroundColor = bins.map(b => b.priority === 'High' ? '#E53935' : (b.priority === 'Medium' ? '#FFB300' : '#4CAF50'));
                 this.charts['overviewChart'].update();
-            }
-
-            // Update sector chart (avg fill by sector)
-            if (this.charts['sectorChart']) {
-                const sectors = [...new Set(bins.map(b => b.sector))];
-                const sectorAvgFill = sectors.map(s => {
-                    const sb = bins.filter(b => b.sector === s);
-                    return Math.round(sb.reduce((sum, b) => sum + b.fillLevel, 0) / sb.length);
-                });
-                this.charts['sectorChart'].data.datasets[0].data = sectorAvgFill;
-                this.charts['sectorChart'].update();
             }
 
             // Update Live Alerts (dismissable)
@@ -418,7 +356,7 @@ class DashboardApp {
     }
 
     async initUserHome() {
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
         const myBin = bins[0];
 
         // 1. Update 3D Liquid Visual
@@ -478,7 +416,7 @@ class DashboardApp {
         this.maps['userMap'] = map;
         setTimeout(() => map.invalidateSize(), 100);
 
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
 
         // 1. Plot Bins
         bins.forEach(bin => {
@@ -602,7 +540,7 @@ class DashboardApp {
 
     /* ================== Admin Logic ================== */
     async initAdminOverview() {
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
 
         // Live stats
         const total = bins.length;
@@ -615,10 +553,6 @@ class DashboardApp {
         el('mon-total', total); el('mon-full', full); el('mon-medium', medium);
         el('mon-health', healthPct + '%');
 
-        // Hide sector chart for users
-        const sectorCard = document.getElementById('sector-chart-card');
-        if (sectorCard && this.role === 'user') sectorCard.style.display = 'none';
-
         // Bar chart — fill levels
         const ctx = document.getElementById('fill-level-chart').getContext('2d');
         this.charts['overviewChart'] = new Chart(ctx, {
@@ -630,29 +564,6 @@ class DashboardApp {
             options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } }
         });
 
-        // Sector-wise avg fill chart (replaces old status pie)
-        const sCtx = document.getElementById('sector-chart').getContext('2d');
-        const sectors = [...new Set(bins.map(b => b.sector))];
-        const sectorAvgFill = sectors.map(s => {
-            const sectorBins = bins.filter(b => b.sector === s);
-            return Math.round(sectorBins.reduce((sum, b) => sum + b.fillLevel, 0) / sectorBins.length);
-        });
-        const sectorColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#E53935'];
-        this.charts['sectorChart'] = new Chart(sCtx, {
-            type: 'doughnut',
-            data: {
-                labels: sectors,
-                datasets: [{ data: sectorAvgFill, backgroundColor: sectorColors.slice(0, sectors.length), borderWidth: 2 }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    title: { display: true, text: 'Avg Fill % by Sector', color: '#1b5e20', font: { size: 13 } }
-                }
-            }
-        });
-
         // Dismissable Alerts
         this.renderAdminAlerts();
     }
@@ -660,7 +571,7 @@ class DashboardApp {
     async renderAdminAlerts() {
         const alertsList = document.getElementById('admin-alerts');
         if (!alertsList) return;
-        const alerts = await MockDB.getAlerts();
+        const alerts = await DB.getAlerts();
         if (alerts.length === 0) {
             alertsList.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fa-solid fa-circle-check" style="color:var(--status-green);font-size:2rem;"></i><p style="margin-top:8px;">All clear! No active alerts.</p></div>`;
             return;
@@ -685,11 +596,10 @@ class DashboardApp {
         const alertEl = document.getElementById(`alert-${id}`);
         if (alertEl) {
             alertEl.classList.add('fade-dismiss');
-            setTimeout(() => {
-                const alert = MockDB.alerts.find(a => a.id === id);
-                if (alert) alert.dismissed = true;
+            setTimeout(async () => {
+                await DB.dismissAlert(DB.alerts.find(a => a.id === id)?._docId);
                 this.renderAdminAlerts();
-                const activeAlerts = MockDB.alerts.filter(a => !a.dismissed).length;
+                const activeAlerts = DB.alerts.filter(a => !a.dismissed).length;
                 const badge = document.getElementById('notification-badge');
                 if (badge) badge.innerText = activeAlerts;
                 this.showToast('Alert dismissed.', 'info');
@@ -706,7 +616,7 @@ class DashboardApp {
         setTimeout(() => map.invalidateSize(), 100);
 
         // Show existing pins initially
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
         bins.forEach(bin => {
             const color = bin.priority === 'High' ? '#E53935' : (bin.priority === 'Medium' ? '#FFB300' : '#4CAF50');
             const icon = L.divIcon({
@@ -722,7 +632,7 @@ class DashboardApp {
 
     refreshRouteMarkers() {
         if (!this.maps['routeMap'] || !this.routeMarkers) return;
-        MockDB.getBins().then(bins => {
+        DB.getBins().then(bins => {
             bins.forEach(bin => {
                 const marker = this.routeMarkers[bin.id];
                 if (!marker) return;
@@ -740,23 +650,21 @@ class DashboardApp {
 
     async simulateDay() {
         console.log('[simulateDay] called');
-        const bins = await MockDB.getBins();
-        bins.forEach(bin => {
-            if (bin.areaType === 'market') bin.fillLevel = Math.min(100, bin.fillLevel + 25);
-            else if (bin.areaType === 'office') bin.fillLevel = Math.min(100, bin.fillLevel + 15);
-            else bin.fillLevel = Math.min(100, bin.fillLevel + 10);
-            bin.priority = bin.fillLevel > 70 ? 'High' : (bin.fillLevel >= 40 ? 'Medium' : 'Low');
-            bin.status = bin.fillLevel >= 90 ? 'full' : (bin.fillLevel >= 50 ? 'medium' : 'empty');
-        });
-        console.log('[simulateDay] bins updated, triggering refresh');
-        MockDB.trigger();
+        const bins = await DB.getBins();
+        await Promise.all(bins.map(bin => {
+            let fill = bin.fillLevel;
+            if (bin.areaType === 'market') fill = Math.min(100, fill + 25);
+            else if (bin.areaType === 'office') fill = Math.min(100, fill + 15);
+            else fill = Math.min(100, fill + 10);
+            return DB.updateBin(bin._docId, { fillLevel: fill });
+        }));
         this.showToast('Day simulated! Market +25%, Office +15%, Residential +10%', 'info');
         this.refreshRouteMarkers();
     }
 
     async generateRoute() {
         console.log('[generateRoute] called');
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
         const overlay = document.getElementById('route-loading');
 
         if (overlay) {
@@ -887,7 +795,7 @@ class DashboardApp {
         const map = this.maps['routeMap'];
         if (!map) return;
 
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
         const urgentBins = bins.filter(b => b.fillLevel > 70);
         if (urgentBins.length === 0) {
             this.showToast("No urgent bins to collect!", "info");
@@ -919,9 +827,7 @@ class DashboardApp {
 
             // Mark bin as collected/empty after visiting
             setTimeout(() => {
-                target.fillLevel = 0;
-                target.status = 'empty';
-                MockDB.trigger(); // Refresh UI
+                DB.updateBin(target._docId, { fillLevel: 0, status: 'empty', priority: 'Low' });
                 currentStop++;
                 setTimeout(moveTruck, 1500); // 1.5s per stop
             }, 1000);
@@ -932,17 +838,12 @@ class DashboardApp {
 
     async initAdminBins() {
         const tbody = document.getElementById('bins-table-body');
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
         const isUser = this.role === 'user';
-
-        // Hide sector column header for users
-        const sectorTh = document.getElementById('bins-sector-th');
-        if (sectorTh) sectorTh.style.display = isUser ? 'none' : '';
 
         tbody.innerHTML = bins.map(bin => `
             <tr>
                 <td><strong>${bin.id}</strong></td>
-                ${isUser ? '' : `<td><small style="padding:4px 8px;background:var(--bg-color);border-radius:4px;font-weight:bold">${bin.sector}</small></td>`}
                 <td>${bin.location}</td>
                 <td><span style="padding:3px 8px;border-radius:12px;font-size:0.8rem;background:${bin.areaType==='market'?'#fff3e0':bin.areaType==='office'?'#e3f2fd':'#e8f5e9'};color:${bin.areaType==='market'?'#e65100':bin.areaType==='office'?'#1565c0':'#2e7d32'}">${bin.areaType}</span></td>
                 <td><span class="status-badge ${bin.status}">${bin.fillLevel}% - ${bin.status.toUpperCase()}</span></td>
@@ -956,7 +857,7 @@ class DashboardApp {
     }
 
     editBin(id) {
-        const bin = MockDB.bins.find(b => b.id === id);
+        const bin = DB.bins.find(b => b.id === id);
         if (!bin) return;
         const modal = document.getElementById('common-modal');
         document.getElementById('modal-title').innerText = `Edit Bin ${id}`;
@@ -972,32 +873,29 @@ class DashboardApp {
             <div class="form-group"><label>Fill Level (%)</label><input type="number" id="edit-bin-fill" value="${bin.fillLevel}" min="0" max="100" style="width:100%;padding:8px 12px;border:1.5px solid var(--border-color,#ddd);border-radius:8px;"></div>
         `;
         document.querySelector('#common-modal .modal-footer .primary-btn').onclick = () => {
-            bin.location = document.getElementById('edit-bin-loc').value.trim() || bin.location;
-            bin.areaType = document.getElementById('edit-bin-area').value;
-            bin.fillLevel = Math.min(100, Math.max(0, parseInt(document.getElementById('edit-bin-fill').value) || bin.fillLevel));
-            bin.priority = bin.fillLevel > 70 ? 'High' : bin.fillLevel >= 40 ? 'Medium' : 'Low';
-            bin.status = bin.fillLevel >= 90 ? 'full' : bin.fillLevel >= 50 ? 'medium' : 'empty';
+            const loc = document.getElementById('edit-bin-loc').value.trim() || bin.location;
+            const areaType = document.getElementById('edit-bin-area').value;
+            const fillLevel = Math.min(100, Math.max(0, parseInt(document.getElementById('edit-bin-fill').value) || bin.fillLevel));
+            DB.updateBin(bin._docId, { location: loc, areaType, fillLevel }).then(() => {
+                this.showToast(`Bin ${id} updated!`, 'success');
+            });
             this.closeModal();
-            this.showToast(`Bin ${id} updated!`, 'success');
-            this.initAdminBins();
-            MockDB.trigger();
         };
         modal.classList.add('active');
     }
 
     deleteBin(id) {
         if (!confirm(`Remove bin ${id} from the system?`)) return;
-        MockDB.bins = MockDB.bins.filter(b => b.id !== id);
-        this.showToast(`Bin ${id} removed.`, 'info');
-        this.initAdminBins();
-        MockDB.trigger();
+        const bin = DB.bins.find(b => b.id === id);
+        if (!bin) return;
+        DB.deleteBin(bin._docId).then(() => this.showToast(`Bin ${id} removed.`, 'info'));
     }
 
-    initAdminAreas() {
-        const areas = JSON.parse(localStorage.getItem('eco_areas') || '{"market":25,"residential":10,"office":15}');
+    async initAdminAreas() {
+        const areas = await DB.getAreas();
         const tbody = document.getElementById('area-config-body');
         if (!tbody) return;
-        const bins = MockDB.bins;
+        const bins = DB.bins;
         tbody.innerHTML = Object.entries(areas).map(([name, mult]) => {
             const count = bins.filter(b => b.areaType === name).length;
             return `<tr>
@@ -1009,43 +907,38 @@ class DashboardApp {
         }).join('');
     }
 
-    saveAreaConfig() {
+    async saveAreaConfig() {
         const name = document.getElementById('area-name-input').value.trim().toLowerCase();
         const mult = parseInt(document.getElementById('area-mult-input').value);
         if (!name || !mult || mult < 1 || mult > 100) { alert('Enter valid area name and multiplier (1-100).'); return; }
-        const areas = JSON.parse(localStorage.getItem('eco_areas') || '{"market":25,"residential":10,"office":15}');
-        areas[name] = mult;
-        localStorage.setItem('eco_areas', JSON.stringify(areas));
+        await DB.saveArea(name, mult);
         this.showToast(`Area "${name}" saved with ${mult}% multiplier.`, 'success');
         this.initAdminAreas();
     }
 
-    deleteArea(name) {
-        const areas = JSON.parse(localStorage.getItem('eco_areas') || '{}');
-        delete areas[name];
-        localStorage.setItem('eco_areas', JSON.stringify(areas));
+    async deleteArea(name) {
+        await DB.deleteArea(name);
         this.showToast(`Area "${name}" removed.`, 'info');
         this.initAdminAreas();
     }
 
-    initAdminThresholds() {
-        const saved = JSON.parse(localStorage.getItem('eco_thresholds') || '{"high":70,"medium":40}');
+    async initAdminThresholds() {
+        const saved = await DB.getThresholds();
         const highEl = document.getElementById('thresh-high');
         const medEl = document.getElementById('thresh-med');
         if (highEl) { highEl.value = saved.high; document.getElementById('thresh-high-val').innerText = saved.high + '%'; }
         if (medEl) { medEl.value = saved.medium; document.getElementById('thresh-med-val').innerText = saved.medium + '%'; }
     }
 
-    saveThresholds() {
+    async saveThresholds() {
         const high = parseInt(document.getElementById('thresh-high').value);
         const medium = parseInt(document.getElementById('thresh-med').value);
         if (medium >= high) { alert('Medium threshold must be lower than High threshold.'); return; }
-        localStorage.setItem('eco_thresholds', JSON.stringify({ high, medium }));
-        // Apply to all bins immediately
-        MockDB.bins.forEach(bin => {
-            bin.priority = bin.fillLevel > high ? 'High' : bin.fillLevel >= medium ? 'Medium' : 'Low';
-        });
-        MockDB.trigger();
+        await DB.saveThresholds(high, medium);
+        await Promise.all(DB.bins.map(bin => {
+            const priority = bin.fillLevel > high ? 'High' : bin.fillLevel >= medium ? 'Medium' : 'Low';
+            return DB.updateBin(bin._docId, { priority });
+        }));
         this.showToast(`Thresholds applied: High >${high}%, Medium >=${medium}%`, 'success');
     }
 
@@ -1054,11 +947,11 @@ class DashboardApp {
         document.querySelectorAll('.pred-range-btn').forEach(btn => {
             btn.classList.toggle('active', parseInt(btn.dataset.range) === range);
         });
-        const bins = await MockDB.getBins();
+        const bins = await DB.getBins();
         this._predRange = range;
 
         // Efficiency summary
-        const totalCollections = MockDB.collectionsToday + bins.filter(b => b.fillLevel < 10).length;
+        const totalCollections = DB.collectionsToday + bins.filter(b => b.fillLevel < 10).length;
         const co2 = (totalCollections * 2.4).toFixed(1);
         const fuelSaved = (totalCollections * 0.8).toFixed(1);
         const el = (id, val) => { const e = document.getElementById(id); if (e) e.innerText = val; };
@@ -1167,7 +1060,7 @@ class DashboardApp {
     }
 
     exportAnalyticsCSV() {
-        MockDB.getBins().then(bins => {
+        DB.getBins().then(bins => {
             const rows = [['Bin ID', 'Sector', 'Area Type', 'Location', 'Fill Level (%)', 'Priority', 'Status', 'Last Updated']];
             bins.forEach(b => rows.push([b.id, b.sector, b.areaType, b.location, b.fillLevel, b.priority, b.status, b.lastUpdated]));
             const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
@@ -1227,11 +1120,9 @@ class DashboardApp {
 
         if (!id || !loc) { alert('Please fill in all fields.'); return; }
 
-        MockDB.bins.push({ id, location: loc, lat, lng, fillLevel: 0, lastUpdated: 'Just now', status: 'empty', areaType: 'residential', sector: 'Public', priority: 'Low' });
+        await DB.addBin({ id, location: loc, lat, lng, fillLevel: 0, lastUpdated: 'Just now', areaType: 'residential', sector: 'Public' });
         this.closeModal();
         this.showToast(`Bin ${id} added successfully!`, 'success');
-        if (this.currentView === 'admin-bins') this.initAdminBins();
-        MockDB.trigger();
     }
 
     /* ================== Toast Notifications ================== */

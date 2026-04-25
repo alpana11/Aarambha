@@ -43,7 +43,7 @@
     <!-- Auth/Role Selection View -->
     <div id="auth-view" class="view-container active">
         <div class="auth-card reveal-anim">
-            <img src="smart_eco_bin_clean.png" alt="Smart Waste 3D" class="hero-3d-image">
+            <img src="assets/bin-3d.png" alt="Smart Waste 3D" class="hero-3d-image">
             <div class="logo">
                 <i class="fa-solid fa-leaf"></i>
                 <h1>SwachhMitra AI</h1>
@@ -266,7 +266,6 @@
                     <thead>
                         <tr>
                             <th>Bin ID</th>
-                            <th id="bins-sector-th">Sector</th>
                             <th>Location</th>
                             <th>Area Type</th>
                             <th>Status</th>
@@ -378,10 +377,6 @@
             <div class="chart-card reveal-anim delay-2">
                 <h3>Live Bin Fill Levels</h3>
                 <div style="position:relative;height:300px;width:100%;"><canvas id="fill-level-chart"></canvas></div>
-            </div>
-            <div class="chart-card reveal-anim delay-2" id="sector-chart-card">
-                <h3 style="margin-bottom:10px;">Avg Fill % by Sector</h3>
-                <div style="position:relative;height:270px;width:100%;"><canvas id="sector-chart"></canvas></div>
             </div>
             <div class="card reveal-anim delay-3">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -554,9 +549,15 @@
         </div>
     </div>
 
+    <!-- Firebase CDN (compat v9) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+
     <!-- App Logic -->
     <script src="js/translations.js"></script>
-
+    <script src="js/firebase.js"></script>
+    <script src="js/db.js"></script>
     <script src="js/quantum-solver.js"></script>
     <script src="js/app.js"></script>
 </body>
