@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Truck } from 'lucide-react';
 
 export default function LoginScreen() {
   const navigate = useNavigate();
@@ -15,8 +16,8 @@ export default function LoginScreen() {
     <div style={{ background: '#1a3a2a', minHeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '32px 24px' }}>
       <div style={{ textAlign: 'center', width: '100%' }}>
 
-        <div style={{ width: 64, height: 64, background: '#16a34a', borderRadius: 20, margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
-          🚛
+        <div style={{ width: 64, height: 64, background: '#16a34a', borderRadius: 20, margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Truck size={30} color="white" strokeWidth={1.8} />
         </div>
         <div style={{ fontSize: 22, fontWeight: 500, color: 'white', marginBottom: 4 }}>SwachhMitra</div>
         <div style={{ fontSize: 13, color: '#86efac', marginBottom: 40 }}>Collector App</div>

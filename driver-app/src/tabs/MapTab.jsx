@@ -1,3 +1,5 @@
+import { Truck } from 'lucide-react';
+
 // Static pin positions matching stopNumber order
 const PIN_POSITIONS = [
   { left: '18%', top: '24%' },
@@ -37,7 +39,9 @@ export default function MapTab({ bins, collectedCount, total, routeSummary, driv
         </div>
 
         {/* Current truck position */}
-        <div style={{ ...pinBase, left: '30%', top: '40%', background: '#3b82f6', width: 24, height: 24, fontSize: 10, border: '3px solid white' }}>▲</div>
+        <div style={{ ...pinBase, left: '30%', top: '40%', background: '#3b82f6', width: 26, height: 26, border: '3px solid white' }}>
+          <Truck size={12} color="white" strokeWidth={2.5} />
+        </div>
 
         {/* Bin pins — color reflects live priority state */}
         {sorted.map((b, i) => {

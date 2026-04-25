@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { Truck, Trash2, Map, CheckCircle, User } from 'lucide-react';
 import { useBins } from '../context/BinsContext';
-import ProgressBar from '../components/ProgressBar';
 import RouteTab from '../tabs/RouteTab';
 import BinsTab from '../tabs/BinsTab';
 import MapTab from '../tabs/MapTab';
 import DoneTab from '../tabs/DoneTab';
 
 const TABS = [
-  { key: 'route', label: 'Route' },
-  { key: 'bins',  label: 'Bins'  },
-  { key: 'map',   label: 'Map'   },
-  { key: 'done',  label: 'Done'  },
+  { key: 'route', label: 'Route', Icon: Truck        },
+  { key: 'bins',  label: 'Bins',  Icon: Trash2       },
+  { key: 'map',   label: 'Map',   Icon: Map          },
+  { key: 'done',  label: 'Done',  Icon: CheckCircle  },
 ];
 
 function getTime() {
@@ -23,12 +23,11 @@ function getTime() {
 }
 
 export default function MainScreen() {
-  const [activeTab, setActiveTab] = useState('route');
-  const [prevTab,   setPrevTab]   = useState(null);
-  const [time,      setTime]      = useState(getTime());
+  const [activeTab,      setActiveTab]      = useState('route');
+  const [time,           setTime]           = useState(getTime());
+  const [profileOpen,    setProfileOpen]    = useState(false);
   const { bins, collectedCount, total, distanceCovered, driver, routeSummary } = useBins();
 
-  // Real-time clock — ticks every second
   useEffect(() => {
     const id = setInterval(() => setTime(getTime()), 1000);
     return () => clearInterval(id);
@@ -36,70 +35,73 @@ export default function MainScreen() {
 
   function switchTab(key) {
     if (key === activeTab) return;
-    setPrevTab(activeTab);
     setActiveTab(key);
   }
 
+  // Fixed top section height: unified header (82px)
+  // Fixed bottom nav height: 56px
+  const TOP_H = 82;
+  const BOT_H = 56;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 700, background: '#f3f4f6' }}>
+    <div style={{ position: 'absolute', inset: 0, background: '#f3f4f6' }}>
 
-      {/* Status bar */}
-      <div style={{ background: '#1a3a2a', padding: '10px 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={statusText}>{time}</span>
-        <div style={{ display: 'flex', gap: 3 }}>
-          {[0, 1, 2].map(i => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80' }} />)}
+      {/* ── Unified header ── */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+        background: '#f3f4f6',
+        padding: '12px 16px 12px',
+      }}>
+        {/* Row 1: driver name (left) · badge + avatar (right) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {driver.name}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a' }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>On Shift</span>
+            </div>
+            <button
+              onClick={() => setProfileOpen(true)}
+              style={{ width: 32, height: 32, borderRadius: '50%', background: '#f0fdf4', border: '1.5px solid #bbf7d0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              aria-label="Profile"
+            >
+              <User size={15} color="#16a34a" strokeWidth={2} />
+            </button>
+          </div>
         </div>
-        <span style={statusText}>GPS On</span>
-      </div>
 
-      {/* Header */}
-      <div style={{ background: '#1e4d35', padding: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: 'white' }}>{driver.name}</div>
-            <div style={{ fontSize: 12, color: '#86efac' }}>Truck #{driver.truckNumber} · {driver.zone}</div>
-          </div>
-          <div style={{ background: '#15803d', borderRadius: 20, padding: '4px 10px', fontSize: 11, color: '#bbf7d0', fontWeight: 500 }}>
-            On Shift
-          </div>
+        {/* Row 2: truck + area */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+          <Truck size={12} color="#9ca3af" strokeWidth={2} />
+          <span style={{ fontSize: 11, color: '#9ca3af' }}>
+            {driver.truckNumber} · {driver.area ?? driver.zone}
+          </span>
         </div>
-        <ProgressBar collected={collectedCount} total={total} />
+
+        {/* Row 3: progress bar */}
+        <div style={{ height: 4, background: '#d1d5db', borderRadius: 99, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%',
+            width: `${Math.round((collectedCount / total) * 100)}%`,
+            background: '#16a34a',
+            borderRadius: 99,
+            transition: 'width 0.4s ease',
+          }} />
+        </div>
       </div>
 
-      {/* Nav tabs — 44px min height */}
-      <div style={{ display: 'flex', background: '#16a34a' }}>
-        {TABS.map(({ key, label }) => (
-          <div
-            key={key}
-            role="button"
-            onClick={() => switchTab(key)}
-            style={{
-              flex: 1, textAlign: 'center',
-              minHeight: 44,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, cursor: 'pointer', transition: 'color 0.2s, background 0.2s',
-              color:        activeTab === key ? 'white' : '#bbf7d0',
-              borderBottom: activeTab === key ? '2px solid white' : '2px solid transparent',
-              background:   activeTab === key ? '#15803d' : 'transparent',
-              userSelect: 'none',
-            }}
-          >
-            {label}
-          </div>
-        ))}
-      </div>
-
-      {/* Tab panels — all mounted, animated with CSS class */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      {/* ── Scrollable content ── */}
+      <div className="scroll-area" style={{ position: 'absolute', top: TOP_H, bottom: BOT_H, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         {TABS.map(({ key }) => (
           <div
             key={key}
             className={activeTab === key ? 'tab-enter' : 'tab-exit'}
             style={{
-              position:  activeTab === key ? 'relative' : 'absolute',
-              inset:     0,
-              // active tab is in flow; inactive tabs are pulled out of flow but kept mounted
-              visibility: activeTab === key ? 'visible' : 'hidden',
+              position:      activeTab === key ? 'relative' : 'absolute',
+              inset:         0,
+              visibility:    activeTab === key ? 'visible' : 'hidden',
               pointerEvents: activeTab === key ? 'auto' : 'none',
             }}
           >
@@ -110,8 +112,88 @@ export default function MainScreen() {
           </div>
         ))}
       </div>
+
+      {/* ── Bottom navigation ── */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: BOT_H,
+        display: 'flex',
+        background: '#ffffff',
+        borderTop: '1px solid #e5e7eb',
+        boxShadow: '0 -1px 0 #e5e7eb, 0 -4px 12px rgba(0,0,0,0.06)',
+        zIndex: 10,
+      }}>
+        {TABS.map(({ key, label, Icon }) => {
+          const active = activeTab === key;
+          const color  = active ? '#16a34a' : '#9ca3af';
+          return (
+            <button
+              key={key}
+              onClick={() => switchTab(key)}
+              style={{
+                flex: 1, height: '100%', position: 'relative',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
+              }}
+            >
+              {/* Active top-bar indicator */}
+              <div style={{
+                position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+                width: 24, height: 2.5, borderRadius: '0 0 3px 3px',
+                background: active ? '#16a34a' : 'transparent',
+                transition: 'background 0.2s',
+              }} />
+              <Icon
+                size={21}
+                color={color}
+                strokeWidth={active ? 2.5 : 1.8}
+                style={{ transition: 'color 0.2s, stroke 0.2s' }}
+              />
+              <span style={{
+                fontSize: 10, fontWeight: active ? 700 : 500,
+                color, transition: 'color 0.2s', lineHeight: 1,
+                letterSpacing: active ? 0.1 : 0,
+              }}>
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Profile drawer ── */}
+      {profileOpen && (
+        <div
+          onClick={() => setProfileOpen(false)}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 50 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ position: 'absolute', top: 84, right: 12, background: 'white', width: 210, borderRadius: 14, padding: 18, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#16a34a" strokeWidth={2} /></div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{driver.name}</div>
+                <div style={{ fontSize: 11, color: '#6b7280' }}>Driver</div>
+              </div>
+            </div>
+            {[
+              { lbl: 'Truck',  val: `#${driver.truckNumber}`, green: false },
+              { lbl: 'Zone',   val: driver.zone,              green: false },
+              { lbl: 'Shift',  val: driver.shiftStart,        green: false },
+              { lbl: 'Status', val: 'On Shift',               green: true  },
+            ].map(({ lbl, val, green }) => (
+              <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid #f3f4f6' }}>
+                <span style={{ fontSize: 12, color: '#6b7280' }}>{lbl}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: green ? '#16a34a' : '#111827' }}>{val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-const statusText = { color: '#a0d4b0', fontSize: 11, fontWeight: 500 };
+const statusText = { color: '#a0d4b0', fontSize: 11, fontWeight: 500 }; // kept for potential reuse

@@ -89,6 +89,7 @@ export const driver = {
   name:        'Ravi Kumar',
   truckNumber: 'T-07',
   zone:        'Zone B',
+  area:        'Market Area · Ward 12',
   shiftStart:  '07:30 AM',
 };
 
