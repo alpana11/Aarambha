@@ -25,7 +25,7 @@ export default function MapTab({ bins, collectedCount, total, routeSummary, driv
   const sorted = [...bins].sort((a, b) => a.stopNumber - b.stopNumber);
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: 12, background: '#f3f4f6' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 20px', background: '#f1f8f4' }}>
 
       {/* Map mockup */}
       <div style={{ background: '#e8f5e9', borderRadius: 12, height: 200, position: 'relative', overflow: 'hidden', border: '0.5px solid #e5e7eb', marginBottom: 10 }}>
@@ -66,7 +66,7 @@ export default function MapTab({ bins, collectedCount, total, routeSummary, driv
       </div>
 
       {/* Route summary — from routeSummary prop */}
-      <div style={{ background: 'white', border: '0.5px solid #e5e7eb', borderRadius: 12, padding: '12px 14px' }}>
+      <div style={{ background: 'white', border: '1px solid #f0f0f0', borderRadius: 12, padding: '12px 14px' }}>
         <div style={{ fontSize: 13, fontWeight: 500, color: '#111827', marginBottom: 8 }}>Route Summary</div>
         {[
           { lbl: 'Total stops',          val: total,                                          green: false },

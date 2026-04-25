@@ -7,7 +7,7 @@ export default function DoneTab({ bins, collectedCount, distanceCovered, driver 
   const allDone = collectedCount === total && total > 0;
 
   return (
-    <div style={{ padding: '12px 16px 20px', background: '#f3f4f6' }}>
+    <div style={{ padding: '12px 16px 20px', background: '#f1f8f4' }}>
 
       {/* ── Hero summary card ── */}
       <div style={{
@@ -83,14 +83,14 @@ export default function DoneTab({ bins, collectedCount, distanceCovered, driver 
       ) : (
         <>
           <div style={sectionHeader}>
-            <CheckCircle size={11} color="#16a34a" strokeWidth={2.5} />
+            <CheckCircle size={11} color="#16a34a" strokeWidth={2} />
             Collected today
             <span style={countPill}>{done.length}</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {done.map(b => (
-              <div key={b.id} style={{
+              <div key={b.id} className="tap" style={{
                 background: 'white',
                 borderRadius: 12,
                 border: '1px solid #f0f0f0',
@@ -100,7 +100,7 @@ export default function DoneTab({ bins, collectedCount, distanceCovered, driver 
               }}>
                 {/* Check icon */}
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <CheckCircle size={15} color="#16a34a" strokeWidth={2.5} />
+                <CheckCircle size={15} color="#16a34a" strokeWidth={2} />
                 </div>
 
                 {/* Name + area */}

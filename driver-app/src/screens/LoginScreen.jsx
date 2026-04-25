@@ -44,7 +44,7 @@ export default function LoginScreen() {
             onChange={e => setPin(e.target.value)}
           />
 
-          <button type="submit" style={submitBtn}>Start Shift</button>
+          <button type="submit" className="tap-btn" style={submitBtn}>Start Shift</button>
         </form>
 
         <div style={{ marginTop: 20, fontSize: 11, color: 'rgba(74,222,128,0.6)' }}>Demo: use any credentials</div>

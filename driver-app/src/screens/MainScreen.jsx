@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Truck, Trash2, Map, CheckCircle, User } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Truck, Trash2, Map, CheckCircle, User, Bell } from 'lucide-react';
 import { useBins } from '../context/BinsContext';
 import RouteTab from '../tabs/RouteTab';
 import BinsTab from '../tabs/BinsTab';
@@ -28,6 +29,12 @@ export default function MainScreen() {
   const [profileOpen,    setProfileOpen]    = useState(false);
   const { bins, collectedCount, total, distanceCovered, driver, routeSummary } = useBins();
 
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.tab) setActiveTab(location.state.tab);
+  }, [location.state]);
+
   useEffect(() => {
     const id = setInterval(() => setTime(getTime()), 1000);
     return () => clearInterval(id);
@@ -38,50 +45,63 @@ export default function MainScreen() {
     setActiveTab(key);
   }
 
-  // Fixed top section height: unified header (82px)
+  // Fixed top section height: header (96px)
   // Fixed bottom nav height: 56px
-  const TOP_H = 82;
+  const TOP_H = 96;
   const BOT_H = 56;
 
-  return (
-    <div style={{ position: 'absolute', inset: 0, background: '#f3f4f6' }}>
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
 
-      {/* ── Unified header ── */}
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#f1f8f4' }}>
+
+      {/* ── Header ── */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
-        background: '#f3f4f6',
-        padding: '12px 16px 12px',
+        background: '#f1f8f4',
+        padding: '14px 16px 10px',
       }}>
-        {/* Row 1: driver name (left) · badge + avatar (right) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {driver.name}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a' }} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>On Shift</span>
+        {/* Row 1: avatar · greeting+name · bell */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+
+          {/* Avatar */}
+          <button
+            onClick={() => setProfileOpen(true)}
+            className="tap"
+            style={{ width: 40, height: 40, borderRadius: '50%', background: '#dcfce7', border: '2px solid #86efac', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            aria-label="Profile"
+          >
+            <User size={18} color="#16a34a" strokeWidth={2} />
+          </button>
+
+          {/* Greeting + name */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, lineHeight: 1.2 }}>{greeting},</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {driver.name}
             </div>
-            <button
-              onClick={() => setProfileOpen(true)}
-              style={{ width: 32, height: 32, borderRadius: '50%', background: '#f0fdf4', border: '1.5px solid #bbf7d0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-              aria-label="Profile"
-            >
-              <User size={15} color="#16a34a" strokeWidth={2} />
-            </button>
+          </div>
+
+          {/* Bell */}
+          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'white', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Bell size={16} color="#6b7280" strokeWidth={1.8} />
           </div>
         </div>
 
         {/* Row 2: truck + area */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
-          <Truck size={12} color="#9ca3af" strokeWidth={2} />
+          <Truck size={11} color="#9ca3af" strokeWidth={2} />
           <span style={{ fontSize: 11, color: '#9ca3af' }}>
             {driver.truckNumber} · {driver.area ?? driver.zone}
           </span>
+          <span style={{ fontSize: 11, color: '#d1d5db', marginLeft: 2 }}>·</span>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', marginLeft: 2 }} />
+          <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>On Shift</span>
         </div>
 
         {/* Row 3: progress bar */}
-        <div style={{ height: 4, background: '#d1d5db', borderRadius: 99, overflow: 'hidden' }}>
+        <div style={{ height: 3, background: '#d4edda', borderRadius: 99, overflow: 'hidden' }}>
           <div style={{
             height: '100%',
             width: `${Math.round((collectedCount / total) * 100)}%`,
@@ -93,7 +113,7 @@ export default function MainScreen() {
       </div>
 
       {/* ── Scrollable content ── */}
-      <div className="scroll-area" style={{ position: 'absolute', top: TOP_H, bottom: BOT_H, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+      <div className="scroll-area" style={{ position: 'absolute', top: TOP_H, bottom: 0, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden', paddingBottom: BOT_H }}>
         {TABS.map(({ key }) => (
           <div
             key={key}
@@ -146,8 +166,8 @@ export default function MainScreen() {
               <Icon
                 size={21}
                 color={color}
-                strokeWidth={active ? 2.5 : 1.8}
-                style={{ transition: 'color 0.2s, stroke 0.2s' }}
+                strokeWidth={2}
+                style={{ transition: 'color 0.2s' }}
               />
               <span style={{
                 fontSize: 10, fontWeight: active ? 700 : 500,
@@ -169,7 +189,7 @@ export default function MainScreen() {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ position: 'absolute', top: 84, right: 12, background: 'white', width: 210, borderRadius: 14, padding: 18, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}
+            style={{ position: 'absolute', top: 100, right: 12, background: 'white', width: 210, borderRadius: 14, padding: 18, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#16a34a" strokeWidth={2} /></div>
