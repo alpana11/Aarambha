@@ -59,6 +59,11 @@ export default function LoginScreen() {
       localStorage.setItem('driver_id',    driverDoc.id);
       localStorage.setItem('collector_id', driverData.collectorId);
       localStorage.setItem('driver_name',  driverData.name);
+      // Mark driver online in Firestore
+      await updateDoc(doc(db, 'drivers', driverDoc.id), {
+        isOnline: true,
+        lastSeen: new Date().toISOString(),
+      });
       navigate('/main');
     } catch (err) {
       console.error(err);

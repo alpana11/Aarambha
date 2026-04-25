@@ -14,8 +14,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // Collection references
-const binsRef   = db.collection('bins');
-const alertsRef = db.collection('alerts');
-const usersRef  = db.collection('users');
-const areasRef  = db.collection('areas');
-const configRef = db.collection('config');
+const binsRef    = db.collection('bins');
+const alertsRef  = db.collection('alerts');
+const usersRef   = db.collection('users');
+const areasRef   = db.collection('areas');
+const configRef  = db.collection('config');
+const driversRef = db.collection('drivers');

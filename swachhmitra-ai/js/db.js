@@ -40,18 +40,21 @@ const SEED_USERS = [
 const FirebaseDB = {
     bins: [],
     alerts: [],
+    drivers: [],
     collectionsToday: 0,
     co2Saved: 0,
 
     _listeners: [],
     _unsubBins: null,
     _unsubAlerts: null,
+    _unsubDrivers: null,
 
     // ── Public API ─────────────────────────────────────────────────────────
-    getBins()   { return Promise.resolve(this.bins); },
-    getAlerts() { return Promise.resolve(this.alerts.filter(a => !a.dismissed)); },
-    onChange(cb){ this._listeners.push(cb); },
-    trigger()   { this._listeners.forEach(cb => cb()); },
+    getBins()    { return Promise.resolve(this.bins); },
+    getAlerts()  { return Promise.resolve(this.alerts.filter(a => !a.dismissed)); },
+    getDrivers() { return Promise.resolve(this.drivers); },
+    onChange(cb) { this._listeners.push(cb); },
+    trigger()    { this._listeners.forEach(cb => cb()); },
 
     // ── Init: seed if empty, then start listeners ──────────────────────────
     async init() {
@@ -111,6 +114,11 @@ const FirebaseDB = {
             this.alerts = snap.docs.map(doc => ({ _docId: doc.id, dismissed: false, ...doc.data() }));
             this.trigger();
         }, err => console.error('[FirebaseDB] alerts error:', err));
+
+        this._unsubDrivers = driversRef.onSnapshot(snap => {
+            this.drivers = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+            this.trigger();
+        }, err => console.error('[FirebaseDB] drivers error:', err));
     },
 
     // ── Bin CRUD ───────────────────────────────────────────────────────────

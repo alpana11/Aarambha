@@ -61,10 +61,11 @@ export default function BinDetailScreen() {
   }
 
   const details = [
-    { lbl: 'Last collected', val: bin.lastCollected },
+    { lbl: 'Distance',       val: bin.distance > 0 ? `${bin.distance} km away` : '—' },
+    { lbl: 'Last collected', val: bin.lastCollected ?? '—' },
     { lbl: 'Area type',      val: bin.area          },
     { lbl: 'Bin ID',         val: bin.id            },
-    { lbl: 'Capacity',       val: bin.capacity      },
+    { lbl: 'Capacity',       val: bin.capacity || '—' },
   ];
 
   return (

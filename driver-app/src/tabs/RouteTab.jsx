@@ -3,9 +3,16 @@ import { Navigation, AlertTriangle, Clock, MapPin, ChevronRight, Trash2, AlertCi
 import StatusBadge from '../components/StatusBadge';
 import { showToast } from '../components/Toast';
 
-export default function RouteTab({ bins }) {
+const PRIORITY_RANK = { HIGH: 1, MEDIUM: 2, LOW: 3 };
+
+export default function RouteTab({ bins, onNavigate }) {
   const navigate = useNavigate();
-  const pending  = bins.filter(b => b.priority !== 'DONE');
+  const pending  = bins
+    .filter(b => b.priority !== 'DONE')
+    .sort((a, b) => {
+      const rankDiff = (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
+      return rankDiff !== 0 ? rankDiff : (a.distance ?? 0) - (b.distance ?? 0);
+    });
   const nextStop = pending[0] ?? null;
   const upNext   = pending.slice(1);
   const kmLeft   = pending.reduce((s, b) => s + b.distance, 0).toFixed(1);
@@ -75,7 +82,10 @@ export default function RouteTab({ bins }) {
                 </div>
               )}
 
-              <button className="tap-btn" style={btnNavigate} onClick={() => showToast('Opening navigation...')}>
+              <button className="tap-btn" style={btnNavigate} onClick={() => {
+                if (!nextStop.lat || !nextStop.lng) { showToast('Location not available', 'info'); return; }
+                onNavigate({ id: nextStop.id, lat: nextStop.lat, lng: nextStop.lng, name: nextStop.name });
+              }}>
                 <Navigation size={17} color="white" strokeWidth={2} />
                 Navigate
               </button>

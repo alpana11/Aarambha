@@ -1,18 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Truck, Trash2, Map, CheckCircle, User, Bell } from 'lucide-react';
 import { useBins } from '../context/BinsContext';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { showToast } from '../components/Toast';
 import RouteTab from '../tabs/RouteTab';
 import BinsTab from '../tabs/BinsTab';
 import MapTab from '../tabs/MapTab';
 import DoneTab from '../tabs/DoneTab';
+import NotificationsTab from '../tabs/NotificationsTab';
 
 const TABS = [
-  { key: 'route', label: 'Route', Icon: Truck        },
-  { key: 'bins',  label: 'Bins',  Icon: Trash2       },
-  { key: 'map',   label: 'Map',   Icon: Map          },
-  { key: 'done',  label: 'Done',  Icon: CheckCircle  },
+  { key: 'route', label: 'Route', Icon: Truck       },
+  { key: 'bins',  label: 'Bins',  Icon: Trash2      },
+  { key: 'map',   label: 'Map',   Icon: Map         },
+  { key: 'done',  label: 'Done',  Icon: CheckCircle },
 ];
+
+const NAV_TABS = TABS; // bottom nav only shows these 4
 
 function getTime() {
   const now  = new Date();
@@ -24,12 +30,47 @@ function getTime() {
 }
 
 export default function MainScreen() {
-  const [activeTab,      setActiveTab]      = useState('route');
-  const [time,           setTime]           = useState(getTime());
-  const [profileOpen,    setProfileOpen]    = useState(false);
-  const { bins, loading, collectedCount, total, distanceCovered, driver, routeSummary } = useBins();
+  const [activeTab,   setActiveTab]   = useState('route');
+  const [time,        setTime]        = useState(getTime());
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [focusedBin,  setFocusedBin]  = useState(null); // { id, lat, lng, name }
+  const { bins, loading, fullBins, collectedCount, total, distanceCovered, driver, routeSummary } = useBins();
 
   const location = useLocation();
+
+  // ── Toast when a new full bin appears ───────────────────────────
+  const notifiedRef = useRef(new Set());
+  useEffect(() => {
+    fullBins.forEach(b => {
+      if (notifiedRef.current.has(b.id)) return;
+      notifiedRef.current.add(b.id);
+      showToast(`🗑 ${b.name} is full — needs pickup`, 'error');
+    });
+    // Clear flag when bin is no longer full
+    notifiedRef.current.forEach(id => {
+      if (!fullBins.find(b => b.id === id)) notifiedRef.current.delete(id);
+    });
+  }, [fullBins]);
+
+  // ── Keep driver online status in sync ─────────────────────────
+  useEffect(() => {
+    const driverId = localStorage.getItem('driver_id');
+    if (!driverId) return;
+
+    const driverRef = doc(db, 'drivers', driverId);
+    const setOnline  = () => updateDoc(driverRef, { isOnline: true,  lastSeen: new Date().toISOString() });
+    const setOffline = () => updateDoc(driverRef, { isOnline: false, lastSeen: new Date().toISOString() });
+
+    setOnline();
+    const interval = setInterval(() => updateDoc(driverRef, { lastSeen: new Date().toISOString() }), 30000);
+
+    window.addEventListener('beforeunload', setOffline);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', setOffline);
+      setOffline();
+    };
+  }, []);
 
   useEffect(() => {
     if (location.state?.tab) setActiveTab(location.state.tab);
@@ -83,10 +124,18 @@ export default function MainScreen() {
             </div>
           </div>
 
-          {/* Bell */}
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'white', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {/* Bell with badge */}
+          <button
+            onClick={() => setActiveTab('notifications')}
+            style={{ position: 'relative', width: 36, height: 36, borderRadius: '50%', background: 'white', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}
+          >
             <Bell size={16} color="#6b7280" strokeWidth={1.8} />
-          </div>
+            {fullBins.length > 0 && (
+              <div style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', border: '2px solid #f1f8f4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: 'white' }}>{fullBins.length}</span>
+              </div>
+            )}
+          </button>
         </div>
 
         {/* Row 2: truck + area */}
@@ -96,8 +145,10 @@ export default function MainScreen() {
             {driver.truckNumber} · {driver.area ?? driver.zone}
           </span>
           <span style={{ fontSize: 11, color: '#d1d5db', marginLeft: 2 }}>·</span>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', marginLeft: 2 }} />
-          <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>On Shift</span>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: driver.isOnline ? '#16a34a' : '#9ca3af', marginLeft: 2 }} />
+          <span style={{ fontSize: 11, color: driver.isOnline ? '#16a34a' : '#9ca3af', fontWeight: 600 }}>
+            {driver.isOnline ? 'On Shift' : 'Offline'}
+          </span>
         </div>
 
         {/* Row 3: progress bar */}
@@ -124,7 +175,7 @@ export default function MainScreen() {
 
       {/* ── Scrollable content ── */}
       <div className="scroll-area" style={{ position: 'absolute', top: TOP_H, bottom: 0, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden', paddingBottom: BOT_H }}>
-        {TABS.map(({ key }) => (
+        {[...TABS, { key: 'notifications' }].map(({ key }) => (
           <div
             key={key}
             className={activeTab === key ? 'tab-enter' : 'tab-exit'}
@@ -135,10 +186,11 @@ export default function MainScreen() {
               pointerEvents: activeTab === key ? 'auto' : 'none',
             }}
           >
-            {key === 'route' && <RouteTab bins={bins} />}
-            {key === 'bins'  && <BinsTab  bins={bins} />}
-            {key === 'map'   && <MapTab   bins={bins} collectedCount={collectedCount} total={total} routeSummary={routeSummary} driver={driver} />}
-            {key === 'done'  && <DoneTab  bins={bins} collectedCount={collectedCount} distanceCovered={distanceCovered} driver={driver} />}
+            {key === 'route'         && <RouteTab         bins={bins} onNavigate={bin => { setFocusedBin(bin); setActiveTab('map'); }} />}
+            {key === 'bins'          && <BinsTab          bins={bins} />}
+            {key === 'map'           && <MapTab           bins={bins} collectedCount={collectedCount} total={total} routeSummary={routeSummary} focusedBin={focusedBin} onClearFocus={() => setFocusedBin(null)} />}
+            {key === 'done'          && <DoneTab          bins={bins} collectedCount={collectedCount} distanceCovered={distanceCovered} driver={driver} />}
+            {key === 'notifications' && <NotificationsTab />}
           </div>
         ))}
       </div>
@@ -209,10 +261,10 @@ export default function MainScreen() {
               </div>
             </div>
             {[
-              { lbl: 'Truck',  val: `#${driver.truckNumber}`, green: false },
-              { lbl: 'Zone',   val: driver.zone,              green: false },
-              { lbl: 'Shift',  val: driver.shiftStart,        green: false },
-              { lbl: 'Status', val: 'On Shift',               green: true  },
+              { lbl: 'Truck',  val: `#${driver.truckNumber}`,                    green: false },
+              { lbl: 'Zone',   val: driver.zone,                                  green: false },
+              { lbl: 'Shift',  val: driver.shiftStart,                            green: false },
+              { lbl: 'Status', val: driver.isOnline ? 'On Shift' : 'Offline',     green: driver.isOnline },
             ].map(({ lbl, val, green }) => (
               <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid #f3f4f6' }}>
                 <span style={{ fontSize: 12, color: '#6b7280' }}>{lbl}</span>

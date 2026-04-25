@@ -334,64 +334,116 @@ class DashboardApp {
     }
 
     async loadNotifications() {
-        const list = document.getElementById('notification-list');
-        if (!list) return;
-        const alerts = await DB.getAlerts();
+        const list  = document.getElementById('notification-list');
         const badge = document.getElementById('notification-badge');
-        if (badge) badge.innerText = alerts.length;
-        list.innerHTML = alerts.length === 0
-            ? `<p style="text-align:center;color:var(--text-muted);padding:10px;">No active alerts.</p>`
-            : alerts.map(a => `
-            <div class="alert-item ${a.type}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+        if (!list) return;
+
+        const alerts   = await DB.getAlerts();
+        const fullBins = DB.bins.filter(b => b.status === 'full');
+
+        const total = alerts.length + fullBins.length;
+        if (badge) badge.innerText = total;
+
+        // Haversine distance from depot
+        const dist = (lat, lng) => {
+            const R = 6371, dLat = (lat - 28.6139) * Math.PI / 180, dLng = (lng - 77.2090) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(28.6139*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLng/2)**2;
+            return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
+        };
+
+        const fullBinHTML = fullBins.length === 0 ? '' : `
+            <div style="padding:8px 12px 4px;font-size:0.7rem;font-weight:700;color:#E53935;text-transform:uppercase;letter-spacing:0.05em;">
+                <i class="fa-solid fa-trash-can"></i> Full Bins (${fullBins.length})
+            </div>
+            ${fullBins.map(b => `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #fef2f2;">
+                <div style="width:32px;height:32px;border-radius:8px;background:#fef2f2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fa-solid fa-trash-can" style="color:#E53935;font-size:0.85rem;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.82rem;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.location || b.id}</div>
+                    <div style="font-size:0.72rem;color:#9e9e9e;margin-top:1px;">${b.areaType || ''} &nbsp;·&nbsp; ${b.lat && b.lng ? dist(b.lat, b.lng) + ' km away' : ''}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-size:0.85rem;font-weight:800;color:#E53935;">${b.fillLevel}%</div>
+                    <div style="font-size:0.68rem;color:#9e9e9e;">${b.lastUpdated || ''}</div>
+                </div>
+            </div>`).join('')}`;
+
+        const alertHTML = alerts.length === 0 ? '' : `
+            <div style="padding:8px 12px 4px;font-size:0.7rem;font-weight:700;color:#FF8F00;text-transform:uppercase;letter-spacing:0.05em;">
+                <i class="fa-solid fa-triangle-exclamation"></i> System Alerts (${alerts.length})
+            </div>
+            ${alerts.map(a => `
+            <div class="alert-item ${a.type}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:8px 12px;">
                 <div style="display:flex;gap:10px;align-items:flex-start;flex:1;">
                     <i class="fa-solid ${a.type === 'critical' ? 'fa-triangle-exclamation' : 'fa-circle-exclamation'}" style="margin-top:3px;"></i>
                     <div class="alert-content"><h4>${a.msg}</h4><p>${a.time}</p></div>
                 </div>
                 <button onclick="app.dismissAlert(${a.id})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.9rem;" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-        `).join('');
+            </div>`).join('')}`;
+
+        list.innerHTML = total === 0
+            ? `<p style="text-align:center;color:var(--text-muted);padding:16px;">No active alerts.</p>`
+            : fullBinHTML + alertHTML;
     }
 
     async updateRealTimeData() {
-        const bins = await DB.getBins();
+        const bins   = await DB.getBins();
+        const alerts = await DB.getAlerts();
+        const fullBins = bins.filter(b => b.status === 'full');
 
-        let alerts = await DB.getAlerts();
-        document.getElementById('notification-badge').innerText = alerts.length;
+        // Update badge = full bins + system alerts
+        const badge = document.getElementById('notification-badge');
+        if (badge) {
+            const total = fullBins.length + alerts.length;
+            badge.innerText  = total;
+            badge.style.display = total > 0 ? 'block' : 'none';
+        }
 
-        // Smart partial-updates based on view, without destroying chart/map states.
+        // Toast once per session per full bin — only for NEW full bins, not on initial load
+        if (this._initialLoadDone) {
+            fullBins.forEach(b => {
+                const key = `notified_full_${b._docId}`;
+                if (!sessionStorage.getItem(key)) {
+                    sessionStorage.setItem(key, '1');
+                    this.showToast(`🗑 ${b.location || b.id} is FULL (${b.fillLevel}%) — needs collection`, 'critical', true);
+                }
+            });
+        } else {
+            // Seed sessionStorage on first load so existing full bins don't toast
+            fullBins.forEach(b => sessionStorage.setItem(`notified_full_${b._docId}`, '1'));
+            this._initialLoadDone = true;
+        }
+        // Clear flag when bin is no longer full
+        Object.keys(sessionStorage).forEach(key => {
+            if (!key.startsWith('notified_full_')) return;
+            const docId = key.replace('notified_full_', '');
+            if (!fullBins.some(b => b._docId === docId)) sessionStorage.removeItem(key);
+        });
+
+        // Refresh bell dropdown if open
+        if (document.getElementById('notifications-dropdown').classList.contains('active')) {
+            this.loadNotifications();
+        }
+
+        // View-specific live updates
         if (this.currentView === 'admin-overview') {
-            // Update live chart values
             if (this.charts['overviewChart']) {
                 this.charts['overviewChart'].data.datasets[0].data = bins.map(b => b.fillLevel);
                 this.charts['overviewChart'].data.datasets[0].backgroundColor = bins.map(b => b.priority === 'High' ? '#E53935' : (b.priority === 'Medium' ? '#FFB300' : '#4CAF50'));
                 this.charts['overviewChart'].update();
             }
-
-            // Update Live Alerts (dismissable)
             this.renderAdminAlerts();
-
-            // Re-calculate stats silently
+            this.renderDrivers();
             const statValues = document.querySelectorAll('#dashboard-view.active .stat-value');
-            if (statValues.length >= 2) {
-                statValues[1].innerText = bins.filter(b => b.fillLevel >= 90).length; // Full bins count
-            }
-        }
-        else if (this.currentView === 'user-home') {
-            this.initUserHome(); // safe to re-render DOM list
-        }
-        else if (this.currentView === 'admin-bins') {
+            if (statValues.length >= 2) statValues[1].innerText = fullBins.length;
+        } else if (this.currentView === 'user-home') {
+            this.initUserHome();
+        } else if (this.currentView === 'admin-bins') {
             this.initAdminBins();
-        }
-        else if (this.currentView === 'admin-routes') {
+        } else if (this.currentView === 'admin-routes') {
             this.refreshRouteMarkers();
-        }
-        else if (this.currentView === 'admin-overview') {
-            // already handled above
-        }
-
-        // If notifications dropdown is open, update it
-        if (document.getElementById('notifications-dropdown').classList.contains('active')) {
-            this.loadNotifications();
         }
     }
 
@@ -606,6 +658,55 @@ class DashboardApp {
 
         // Dismissable Alerts
         this.renderAdminAlerts();
+        this.renderDrivers();
+    }
+
+    async renderDrivers() {
+        const list = document.getElementById('drivers-list');
+        const badge = document.getElementById('active-driver-count');
+        if (!list) return;
+
+        const drivers = await DB.getDrivers();
+        const online  = drivers.filter(d => d.isOnline);
+
+        if (badge) {
+            badge.innerText = `${online.length} online`;
+            badge.style.background = online.length > 0 ? '#e8f5e9' : '#f5f5f5';
+            badge.style.color      = online.length > 0 ? '#2e7d32' : '#9e9e9e';
+        }
+
+        if (drivers.length === 0) {
+            list.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:20px 0;">No drivers registered yet.</p>`;
+            return;
+        }
+
+        list.innerHTML = drivers.map(d => {
+            const isOnline  = !!d.isOnline;
+            const lastSeen  = d.lastSeen ? new Date(d.lastSeen).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--';
+            const dotColor  = isOnline ? '#4CAF50' : '#9e9e9e';
+            const bgColor   = isOnline ? '#f1f8f4' : '#fafafa';
+            const border    = isOnline ? '1px solid #c8e6c9' : '1px solid #eeeeee';
+            return `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;background:${bgColor};border:${border};">
+                <div style="position:relative;flex-shrink:0;">
+                    <div style="width:38px;height:38px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;">
+                        <i class="fa-solid fa-user" style="color:#2e7d32;"></i>
+                    </div>
+                    <div style="position:absolute;bottom:0;right:0;width:11px;height:11px;border-radius:50%;background:${dotColor};border:2px solid white;"></div>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.9rem;color:var(--text-color,#222);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.name || 'Unknown'}</div>
+                    <div style="font-size:0.75rem;color:var(--text-muted,#888);margin-top:2px;">
+                        <i class="fa-solid fa-truck" style="font-size:0.7rem;"></i> ${d.truckNumber || '--'} &nbsp;·&nbsp;
+                        <i class="fa-solid fa-location-dot" style="font-size:0.7rem;"></i> ${d.zone || '--'}
+                    </div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-size:0.75rem;font-weight:700;color:${dotColor};">${isOnline ? 'ON SHIFT' : 'OFFLINE'}</div>
+                    <div style="font-size:0.7rem;color:var(--text-muted,#aaa);margin-top:2px;">Last seen ${lastSeen}</div>
+                </div>
+            </div>`;
+        }).join('');
     }
 
     async renderAdminAlerts() {
@@ -1166,14 +1267,9 @@ class DashboardApp {
     }
 
     /* ================== Toast Notifications ================== */
-    showToast(message, type = 'warning', binId = null) {
-        // Don't show notifications if not logged in
+    showToast(message, type = 'warning', isBinAlert = false) {
         if (!this.role) return;
-
-        // If we are a standard user, only block binId-specific toasts for other bins
-        if (this.role === 'user' && binId && binId !== 'BIN-001') {
-            return;
-        }
+        if (this.role === 'user' && type === 'critical') return;
 
         const container = document.getElementById('toast-container');
         if (!container) return;
@@ -1182,31 +1278,18 @@ class DashboardApp {
         toast.className = `toast ${type}`;
 
         let icon = 'fa-circle-exclamation';
-        if (type === 'critical') {
-            icon = 'fa-triangle-exclamation';
-            toast.classList.add('critical-pulse');
-        }
+        if (type === 'critical') { icon = 'fa-triangle-exclamation'; toast.classList.add('critical-pulse'); }
         else if (type === 'info') icon = 'fa-circle-info';
 
         toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
 
-        // Update notification badge
-        this.incrementBadge();
+        // Only increment badge for real bin alerts, not routine action toasts
+        if (isBinAlert) this.incrementBadge();
 
-        // Remove on click
-        toast.onclick = () => {
-            toast.classList.add('fade-out');
-            setTimeout(() => toast.remove(), 400);
-        };
-
+        toast.onclick = () => { toast.classList.add('fade-out'); setTimeout(() => toast.remove(), 400); };
         container.appendChild(toast);
-
-        // Auto remove after 5 seconds
         setTimeout(() => {
-            if (document.body.contains(toast)) {
-                toast.classList.add('fade-out');
-                setTimeout(() => toast.remove(), 400);
-            }
+            if (document.body.contains(toast)) { toast.classList.add('fade-out'); setTimeout(() => toast.remove(), 400); }
         }, 5000);
     }
 
